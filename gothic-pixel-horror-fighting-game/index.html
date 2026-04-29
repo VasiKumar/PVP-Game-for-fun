@@ -1,18 +1,1704 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sacrilegium Pugna — Gothic Pixel Horror Fighter</title>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=UnifrakturMaguntia&display=swap');
-      * { image-rendering: pixelated; image-rendering: crisp-edges; }
-      body { margin: 0; background: #0a0608; overflow: hidden; }
-      canvas { display: block; }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SACRILEGIUM PUGNA — Gothic Pixel Horror Fighter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#04020a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;overflow:hidden;}
+#gameWrapper{position:relative;display:flex;flex-direction:column;align-items:center;}
+#gameCanvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;border:2px solid #3a1a0a;box-shadow:0 0 40px rgba(180,60,10,0.3);}
+.overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(4,2,10,0.92);z-index:10;pointer-events:auto;}
+.overlay.hidden{display:none;}
+.panel{background:rgba(10,5,20,0.98);border:2px solid #5a3a1a;border-radius:4px;padding:24px;text-align:center;color:#c8a030;max-width:520px;width:90%;}
+.panel h1{font-size:22px;letter-spacing:3px;text-shadow:0 0 10px rgba(200,160,48,0.5);margin-bottom:6px;}
+.panel h2{font-size:14px;color:#8b1a1a;letter-spacing:2px;margin-bottom:20px;}
+.btn{display:inline-block;background:#1a0808;border:2px solid #8b1a1a;color:#c8a030;padding:10px 24px;margin:5px;cursor:pointer;font-family:monospace;font-size:13px;letter-spacing:1px;transition:all .15s;border-radius:2px;}
+.btn:hover{background:#2a0808;border-color:#c8a030;box-shadow:0 0 10px rgba(200,160,48,0.3);}
+.btn.secondary{border-color:#5a3a1a;color:#886644;}
+.btn.secondary:hover{border-color:#8b6644;color:#c8a030;}
+.diff-btn{min-width:90px;}
+.diff-btn.active{background:#2d1a0a;border-color:#c8a030;color:#ffcc44;}
+.mode-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0;}
+.sep{width:100%;height:1px;background:#2a1510;margin:12px 0;}
+#lobbyPanel .room-code{font-size:30px;letter-spacing:6px;color:#ffcc44;background:#0a0510;border:1px solid #5a3a1a;padding:10px 20px;border-radius:3px;margin:10px 0;display:inline-block;}
+#lobbyPanel input{background:#0a0510;border:2px solid #5a3a1a;color:#c8a030;padding:8px 14px;font-family:monospace;font-size:16px;letter-spacing:4px;width:160px;text-align:center;border-radius:3px;}
+#lobbyPanel input:focus{outline:none;border-color:#8b1a1a;}
+#lobbyStatus{color:#886644;font-size:11px;margin-top:8px;min-height:20px;}
+#controls-hint{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);color:rgba(100,80,50,0.6);font-size:9px;pointer-events:none;white-space:nowrap;}
+.health-info{display:flex;justify-content:space-between;gap:20px;margin-top:10px;font-size:11px;color:#664444;}
+</style>
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="gameCanvas"></canvas>
+  <div id="controls-hint">P1: ← → ↑ ↓ | U I O = LP MP HP | J K L = LK MK HK &nbsp;&nbsp; P2: A D W S | T Y F = LP MP HP | G H B = LK MK HK</div>
+
+  <!-- MAIN MENU -->
+  <div class="overlay" id="mainMenu">
+    <div class="panel">
+      <h1>✝ SACRILEGIUM PUGNA ✝</h1>
+      <h2>— Gothic Pixel Horror Fighter —</h2>
+      <div class="sep"></div>
+      <p style="color:#664444;font-size:11px;margin-bottom:16px;">Choose your mode of suffering</p>
+      <div class="mode-row">
+        <button class="btn" onclick="startMode('vsAI')">⚔ VS COMPUTER</button>
+        <button class="btn" onclick="startMode('local2p')">👥 LOCAL 2 PLAYER</button>
+      </div>
+      <div class="mode-row">
+        <button class="btn secondary" onclick="startMode('online')">🌐 ONLINE CHALLENGE</button>
+      </div>
+      <div class="sep"></div>
+      <p style="color:#886644;font-size:11px;margin-bottom:8px;">AI Difficulty:</p>
+      <div class="mode-row">
+        <button class="btn diff-btn active" id="diff-EASY" onclick="setDiff('EASY')">EASY</button>
+        <button class="btn diff-btn" id="diff-MEDIUM" onclick="setDiff('MEDIUM')">MEDIUM</button>
+        <button class="btn diff-btn" id="diff-HARD" onclick="setDiff('HARD')">HARD</button>
+      </div>
+      <div class="health-info">
+        <span>Arrow keys + UIOJKL = Player 1</span>
+        <span>WASD + TYFGhB = Player 2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONLINE LOBBY -->
+  <div class="overlay hidden" id="lobbyPanel">
+    <div class="panel">
+      <h1>🌐 ONLINE CHALLENGE</h1>
+      <h2>— Challenge a Condemned Soul —</h2>
+      <div class="sep"></div>
+      <p style="color:#886644;font-size:11px;margin-bottom:12px;">Share your code with a friend, or enter theirs:</p>
+      <div style="margin-bottom:12px;">
+        <p style="color:#664444;font-size:10px;margin-bottom:6px;">YOUR ROOM CODE:</p>
+        <div class="room-code" id="myCode">------</div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <p style="color:#664444;font-size:10px;margin-bottom:6px;">ENTER FRIEND'S CODE:</p>
+        <input type="text" id="joinCode" placeholder="XXXXXX" maxlength="6" oninput="this.value=this.value.toUpperCase()">
+        <br><button class="btn" style="margin-top:8px;" onclick="joinRoom()">JOIN ROOM</button>
+      </div>
+      <div id="lobbyStatus">Connecting to network...</div>
+      <div class="sep"></div>
+      <button class="btn secondary" onclick="cancelLobby()">← BACK</button>
+    </div>
+  </div>
+
+  <!-- IN-GAME PAUSE -->
+  <div class="overlay hidden" id="pauseMenu">
+    <div class="panel">
+      <h1>— PAUSED —</h1>
+      <div class="sep"></div>
+      <div class="mode-row">
+        <button class="btn" onclick="resumeGame()">▶ RESUME</button>
+        <button class="btn secondary" onclick="quitToMenu()">✕ QUIT</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script>
+'use strict';
+// ============================================================
+// SACRILEGIUM PUGNA — Complete Game Engine
+// ============================================================
+
+// ── Canvas Setup ─────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = 896, H = 504;
+canvas.width = W; canvas.height = H;
+
+function resizeCanvas() {
+  const scale = Math.min(window.innerWidth / W, window.innerHeight / H) * 0.97;
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ── Constants ──────────────────────────────────────────────
+const GROUND_Y = 400, STAGE_L = 40, STAGE_R = W - 40;
+const GRAVITY = 0.65, JUMP_FORCE = -14.5;
+const GUARD_MAX = 100, GUARD_CRUSH_DUR = 90;
+const POWER_MAX = 100, POWER_STOCKS = 3;
+const ROUND_FRAMES = 99 * 60;
+const PALETTE = {
+  deepVoid:'#080410', shadowBlue:'#0d1a2b', uiGold:'#c8a030',
+  uiRed:'#8b1a1a', uiBorder:'#5a3a1a', healthGreen:'#1a7a2a',
+  healthYellow:'#8a7a10', healthRed:'#7a1010', guardBlue:'#1a3a7a',
+  powerGold:'#8a6010', powerOrange:'#c06010', bloodParticle:'#aa1a1a',
+};
+
+// ── Helper: draw filled rect (pixel art) ─────────────────
+function px(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
+
+// ── Game State ────────────────────────────────────────────
+let gameState = null;
+let gameMode = 'vsAI'; // vsAI | local2p | online
+let aiDifficulty = 'EASY';
+let rafId = null;
+let frameCount = 0;
+let paused = false;
+let p1SelIdx = 0, p2SelIdx = 1;
+let gamePhase = 'TITLE'; // TITLE | CHAR_SELECT | FIGHTING | ROUND_END | GAME_OVER
+
+// ── Online Multiplayer ────────────────────────────────────
+let peer = null, conn = null, isOnlineHost = false, onlineReady = false;
+let remoteInputs = {up:false,down:false,left:false,right:false,lp:false,mp:false,hp:false,lk:false,mk:false,hk:false};
+
+// ── Input System ──────────────────────────────────────────
+const keys = {};
+window.addEventListener('keydown', e => {
+  const was = keys[e.code];
+  keys[e.code] = true;
+  if (!was) onKeyPress(e.code);
+  if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
+  e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+const P1_MAP = {up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',
+  lp:'KeyU',mp:'KeyI',hp:'KeyO',lk:'KeyJ',mk:'KeyK',hk:'KeyL'};
+const P2_MAP = {up:'KeyW',down:'KeyS',left:'KeyA',right:'KeyD',
+  lp:'KeyT',mp:'KeyY',hp:'KeyF',lk:'KeyG',mk:'KeyH',hk:'KeyB'};
+
+function getHeld(map) {
+  return {up:!!keys[map.up],down:!!keys[map.down],left:!!keys[map.left],right:!!keys[map.right],
+    lp:!!keys[map.lp],mp:!!keys[map.mp],hp:!!keys[map.hp],lk:!!keys[map.lk],mk:!!keys[map.mk],hk:!!keys[map.hk]};
+}
+
+// ── Motion Input Buffer ───────────────────────────────────
+class InputBuffer {
+  constructor() { this.dirs=[]; this.btns=[]; this.curDir=5; this.frame=0; }
+  tick(frame) {
+    this.frame=frame;
+    const cut=frame-90;
+    this.dirs=this.dirs.filter(e=>e.f>cut);
+    this.btns=this.btns.filter(e=>e.f>cut);
+  }
+  updateDir(dir) {
+    if(dir!==this.curDir){
+      this.curDir=dir;
+      this.dirs.push({d:dir,f:this.frame});
+      if(this.dirs.length>60)this.dirs=this.dirs.slice(-60);
+    }
+  }
+  press(btn) {
+    this.btns.push({b:btn,f:this.frame});
+    if(this.btns.length>20)this.btns=this.btns.slice(-20);
+  }
+  checkMotion(seq, buttons, window_) {
+    const validBtns=Array.isArray(buttons)?buttons:[buttons];
+    for(const btn of validBtns){
+      const recent=[...this.btns].reverse().find(f=>f.b===btn&&this.frame-f.f<=window_);
+      if(!recent) continue;
+      const pressFrame=recent.f;
+      // Check direction sequence ending at pressFrame
+      let si=seq.length-1;
+      let fi=this.dirs.length-1;
+      while(si>=0&&fi>=0){
+        if(this.dirs[fi].f>pressFrame){fi--;continue;}
+        if(pressFrame-this.dirs[fi].f>window_) break;
+        if(this.dirs[fi].d===seq[si]){si--;}
+        fi--;
+      }
+      if(si<0) return btn;
+    }
+    return null;
+  }
+  consumeButton(btn) {
+    const idx=this.btns.findLastIndex&&this.btns.findLastIndex(e=>e.b===btn)||
+      [...this.btns.entries()].reduceRight((a,[i,e])=>e.b===btn?i:a,-1);
+    if(idx>=0)this.btns.splice(idx,1);
+  }
+}
+
+function keysToNumpad(held, facingRight) {
+  const fwd=facingRight?held.right:held.left;
+  const bk=facingRight?held.left:held.right;
+  if(held.up&&fwd) return 9;
+  if(held.up&&bk) return 7;
+  if(held.down&&fwd) return 3;
+  if(held.down&&bk) return 1;
+  if(held.up) return 8;
+  if(held.down) return 2;
+  if(fwd) return 6;
+  if(bk) return 4;
+  return 5;
+}
+
+// ── Character Data ────────────────────────────────────────
+function fd(id,su,ac,re,dmg,gd,hs,bs,kd,pb,type='MID',pri='NORMAL',hy=-60,hh=30){
+  return{id,totalFrames:su+ac+re,startupFrames:su,activeFrames:ac,recoveryFrames:re,
+    hitboxes:[{rect:{x:20,y:hy,w:55,h:hh},damage:dmg,guardDamage:gd,hitstun:hs,blockstun:bs,
+      knockdown:kd,pushback:pb,type,priority:pri}],
+    hurtboxes:[{x:-20,y:-90,w:50,h:90}],cancelableInto:[],superCancelable:pri!=='NORMAL'};
+}
+
+const ROSTER = [
+  {
+    id:'penitent',name:'El Condenado',title:'The Penitent One',archetype:'BALANCED',
+    stats:{maxHealth:1000,walkSpeed:3.2,jumpHeight:14.5,weight:1.0,defense:1.0},
+    palette:{primary:'#2a2030',secondary:'#5a4030',accent:'#8b1a1a',blood:'#cc2222',shadow:'#100810'},
+    spriteConfig:{bodyColor:'#3a3040',armorColor:'#5a4a50',weaponColor:'#7a6060',eyeColor:'#cc2222',effectColor:'#8b1a1a',particleColor:'#cc2222'},
+    lore:'Condemned to walk in eternal penance, bearing the weight of the True Guilt. His barbed sword Mea Culpa is both weapon and penance.',
+    moves:[
+      {id:'p_lp',name:'Barbed Jab',type:'NORMAL',frameData:fd('p_lp',4,3,8,28,4,10,6,false,3),meterGain:8,meterBlock:3},
+      {id:'p_mp',name:'Mea Culpa Slash',type:'NORMAL',frameData:fd('p_mp',6,4,12,52,8,15,10,false,5),meterGain:12,meterBlock:5},
+      {id:'p_hp',name:'Penitential Blow',type:'NORMAL',frameData:fd('p_hp',9,5,18,80,12,20,14,false,8,'MID','NORMAL',-70,35),meterGain:18,meterBlock:7},
+      {id:'p_lk',name:'Shin Kick',type:'NORMAL',frameData:fd('p_lk',5,3,9,24,3,9,5,false,2,'LOW'),meterGain:7,meterBlock:3},
+      {id:'p_mk',name:'Saeta Stomp',type:'NORMAL',frameData:fd('p_mk',7,4,13,48,7,14,9,false,5),meterGain:11,meterBlock:4},
+      {id:'p_hk',name:'Capirote Kick',type:'NORMAL',frameData:fd('p_hk',10,5,20,75,11,19,13,false,7),meterGain:16,meterBlock:6},
+      {id:'p_sa',name:'Thorn Penance',type:'SPECIAL',
+        input:{seq:[2,3,6],btn:['LP','MP','HP'],win:30},isProjectile:true,
+        frameData:{id:'p_sa',totalFrames:40,startupFrames:14,activeFrames:60,recoveryFrames:26,
+          hitboxes:[{rect:{x:0,y:-55,w:20,h:20},damage:45,guardDamage:12,hitstun:14,blockstun:8,knockdown:false,pushback:10,type:'PROJECTILE',priority:'SPECIAL'}],
+          hurtboxes:[{x:-20,y:-90,w:50,h:90}],cancelableInto:[],superCancelable:false},meterGain:20,meterBlock:10},
+      {id:'p_sb',name:'Rising Martyrdom',type:'SPECIAL',
+        input:{seq:[2,1,4],btn:['LP','MP','HP'],win:30},isAntiAir:true,
+        frameData:{id:'p_sb',totalFrames:45,startupFrames:3,activeFrames:8,recoveryFrames:34,
+          hitboxes:[{rect:{x:10,y:-100,w:45,h:80},damage:75,guardDamage:14,hitstun:22,blockstun:15,knockdown:false,pushback:8,type:'MID',priority:'SPECIAL'}],
+          hurtboxes:[{x:-10,y:-110,w:35,h:30}],cancelableInto:[],superCancelable:true},meterGain:25,meterBlock:8},
+      {id:'p_sdm',name:'The Miracle Incarnate',type:'SDM',meterCost:1,
+        input:{seq:[2,3,6,2,3,6],btn:['LP','MP','HP'],win:50},
+        frameData:{id:'p_sdm',totalFrames:120,startupFrames:12,activeFrames:45,recoveryFrames:63,
+          hitboxes:[{rect:{x:-300,y:-100,w:700,h:90},damage:280,guardDamage:40,hitstun:40,blockstun:25,knockdown:true,pushback:0,type:'MID',priority:'SUPER',launchY:-8}],
+          hurtboxes:[],cancelableInto:[],superCancelable:false},meterGain:0,meterBlock:5},
+    ]
+  },
+  {
+    id:'martyr',name:'La Bestia Mártir',title:'The Martyr-Beast',archetype:'GRAPPLER',
+    stats:{maxHealth:1200,walkSpeed:2.4,jumpHeight:11.0,weight:1.4,defense:0.9},
+    palette:{primary:'#2a1810',secondary:'#4a2e1a',accent:'#6a4a2a',blood:'#aa1a1a',shadow:'#100808'},
+    spriteConfig:{bodyColor:'#4a3020',armorColor:'#6a4a30',weaponColor:'#606878',eyeColor:'#ff4400',effectColor:'#aa2200',particleColor:'#884422'},
+    lore:'Once a penitent friar who prayed for the suffering of the world to be lifted. The Miracle answered by fusing torment into his flesh with chains of living thorns.',
+    moves:[
+      {id:'mb_lp',name:'Chain Lash',type:'NORMAL',frameData:fd('mb_lp',7,4,12,35,5,12,7,false,4),meterGain:9,meterBlock:4},
+      {id:'mb_mp',name:'Bone Hammer',type:'NORMAL',frameData:fd('mb_mp',10,5,16,68,10,18,12,false,7,'MID','NORMAL',-65,38),meterGain:15,meterBlock:6},
+      {id:'mb_hp',name:'Martyrdom Slam',type:'NORMAL',frameData:fd('mb_hp',12,6,22,100,15,24,16,true,12,'MID','NORMAL',-80,45),meterGain:22,meterBlock:9},
+      {id:'mb_lk',name:'Stomp Kick',type:'NORMAL',frameData:fd('mb_lk',6,4,11,30,4,11,6,false,3,'LOW'),meterGain:8,meterBlock:3},
+      {id:'mb_mk',name:'Knee Crush',type:'NORMAL',frameData:fd('mb_mk',9,5,15,58,9,16,11,false,6),meterGain:13,meterBlock:5},
+      {id:'mb_hk',name:'Chain Sweep',type:'NORMAL',frameData:fd('mb_hk',11,6,22,85,13,21,14,true,9,'LOW'),meterGain:19,meterBlock:7},
+      {id:'mb_sa',name:'Barbed Gospel',type:'SPECIAL',
+        input:{seq:[2,3,6],btn:['LP','MP','HP'],win:30},isProjectile:true,
+        frameData:{id:'mb_sa',totalFrames:55,startupFrames:18,activeFrames:50,recoveryFrames:37,
+          hitboxes:[{rect:{x:0,y:-55,w:25,h:25},damage:55,guardDamage:14,hitstun:16,blockstun:10,knockdown:false,pushback:8,type:'PROJECTILE',priority:'SPECIAL'}],
+          hurtboxes:[{x:-20,y:-90,w:50,h:90}],cancelableInto:[],superCancelable:false},meterGain:22,meterBlock:10},
+      {id:'mb_sb',name:"Heaven's Chain",type:'SPECIAL',
+        input:{seq:[2,1,4],btn:['LP','MP','HP'],win:30},isAntiAir:true,
+        frameData:{id:'mb_sb',totalFrames:50,startupFrames:4,activeFrames:10,recoveryFrames:36,
+          hitboxes:[{rect:{x:5,y:-110,w:50,h:90},damage:90,guardDamage:16,hitstun:26,blockstun:16,knockdown:false,pushback:10,type:'MID',priority:'SPECIAL',launchY:-7}],
+          hurtboxes:[{x:-10,y:-115,w:40,h:25}],cancelableInto:[],superCancelable:true},meterGain:28,meterBlock:9},
+      {id:'mb_sdm',name:'Martyrdom Judgment',type:'SDM',meterCost:1,
+        input:{seq:[2,3,6,2,3,6],btn:['LP','MP','HP'],win:50},
+        frameData:{id:'mb_sdm',totalFrames:130,startupFrames:15,activeFrames:50,recoveryFrames:65,
+          hitboxes:[{rect:{x:-350,y:-120,w:800,h:100},damage:300,guardDamage:45,hitstun:42,blockstun:26,knockdown:true,pushback:0,type:'MID',priority:'SUPER',launchY:-10}],
+          hurtboxes:[],cancelableInto:[],superCancelable:false},meterGain:0,meterBlock:5},
+    ]
+  },
+  {
+    id:'oracle',name:'La Oráculo Llorosa',title:'The Weeping Oracle',archetype:'ZONER',
+    stats:{maxHealth:850,walkSpeed:2.8,jumpHeight:15.0,weight:0.8,defense:1.1},
+    palette:{primary:'#1a1030',secondary:'#3a2050',accent:'#5a3070',blood:'#8822aa',shadow:'#080410'},
+    spriteConfig:{bodyColor:'#2a1840',armorColor:'#4a2860',weaponColor:'#d4c8b0',eyeColor:'#cc88ff',effectColor:'#8822aa',particleColor:'#9933cc'},
+    lore:'She was chosen by the Miracle to witness everything — past, present, future. The knowledge tore out her eyes. Now she weeps blood and shattered glass, bleeding icons orbiting her like mourning planets.',
+    moves:[
+      {id:'or_lp',name:'Relic Shove',type:'NORMAL',frameData:fd('or_lp',5,3,10,26,4,9,5,false,3),meterGain:8,meterBlock:3},
+      {id:'or_mp',name:'Icon Flail',type:'NORMAL',frameData:fd('or_mp',7,4,14,50,7,14,9,false,5,'HIGH'),meterGain:12,meterBlock:5},
+      {id:'or_hp',name:'Revelation Blast',type:'NORMAL',frameData:fd('or_hp',10,5,19,80,12,20,13,false,8),meterGain:18,meterBlock:7},
+      {id:'or_lk',name:'Phantom Kick',type:'NORMAL',frameData:fd('or_lk',5,3,9,22,3,8,4,false,2,'LOW'),meterGain:6,meterBlock:2},
+      {id:'or_mk',name:'Float Stomp',type:'NORMAL',frameData:fd('or_mk',8,4,14,46,6,13,8,false,4),meterGain:10,meterBlock:4},
+      {id:'or_hk',name:'Weeping Arc',type:'NORMAL',frameData:fd('or_hk',10,5,20,72,10,18,12,false,7),meterGain:15,meterBlock:6},
+      {id:'or_sa',name:'Crawling Reliquary',type:'SPECIAL',
+        input:{seq:[2,3,6],btn:['LP','MP','HP'],win:30},isProjectile:true,
+        frameData:{id:'or_sa',totalFrames:38,startupFrames:10,activeFrames:70,recoveryFrames:28,
+          hitboxes:[{rect:{x:0,y:-40,w:18,h:18},damage:40,guardDamage:11,hitstun:12,blockstun:8,knockdown:false,pushback:9,type:'PROJECTILE',priority:'SPECIAL'}],
+          hurtboxes:[{x:-20,y:-90,w:50,h:90}],cancelableInto:[],superCancelable:false},meterGain:16,meterBlock:8},
+      {id:'or_sb',name:'Pillar of Tears',type:'SPECIAL',
+        input:{seq:[2,1,4],btn:['LP','MP','HP'],win:30},isAntiAir:true,
+        frameData:{id:'or_sb',totalFrames:42,startupFrames:4,activeFrames:10,recoveryFrames:28,
+          hitboxes:[{rect:{x:-10,y:-130,w:55,h:110},damage:70,guardDamage:12,hitstun:22,blockstun:14,knockdown:false,pushback:6,type:'MID',priority:'SPECIAL',launchY:-6}],
+          hurtboxes:[{x:-5,y:-135,w:35,h:25}],cancelableInto:[],superCancelable:true},meterGain:24,meterBlock:8},
+      {id:'or_sdm',name:'Tears of Heaven',type:'SDM',meterCost:1,
+        input:{seq:[2,3,6,2,3,6],btn:['LP','MP','HP'],win:50},
+        frameData:{id:'or_sdm',totalFrames:115,startupFrames:10,activeFrames:50,recoveryFrames:55,
+          hitboxes:[{rect:{x:-350,y:-150,w:800,h:130},damage:260,guardDamage:42,hitstun:38,blockstun:24,knockdown:true,pushback:0,type:'MID',priority:'SUPER',launchY:-9}],
+          hurtboxes:[],cancelableInto:[],superCancelable:false},meterGain:0,meterBlock:5},
+    ]
+  },
+  {
+    id:'seraph',name:'La Abominación Seráfica',title:'The Seraphic Abomination',archetype:'AERIAL',
+    stats:{maxHealth:900,walkSpeed:3.6,jumpHeight:16.0,weight:0.9,defense:1.05},
+    palette:{primary:'#101828',secondary:'#1a2840',accent:'#303858',blood:'#aabbdd',shadow:'#080c14'},
+    spriteConfig:{bodyColor:'#2a3850',armorColor:'#a0a8b8',weaponColor:'#7a7060',eyeColor:'#ffffff',effectColor:'#d8e0f0',particleColor:'#aabbcc'},
+    lore:'A seraph whose devotion to the Miracle was so absolute that the divine light granted too many blessings at once — arms, wings, eyes, all multiplied beyond holy geometry.',
+    moves:[
+      {id:'sr_lp',name:'Bone Talon Jab',type:'NORMAL',frameData:fd('sr_lp',4,3,8,26,4,9,5,false,3),meterGain:8,meterBlock:3},
+      {id:'sr_mp',name:'Rusted Spear Thrust',type:'NORMAL',frameData:fd('sr_mp',6,4,12,50,8,14,10,false,5),meterGain:12,meterBlock:5},
+      {id:'sr_hp',name:'Celestial Wrath',type:'NORMAL',frameData:fd('sr_hp',9,5,18,78,12,19,13,false,8,'MID','NORMAL',-75,40),meterGain:18,meterBlock:7},
+      {id:'sr_lk',name:'Talon Sweep',type:'NORMAL',frameData:fd('sr_lk',4,3,8,22,3,8,5,false,2,'LOW'),meterGain:7,meterBlock:3},
+      {id:'sr_mk',name:'Wing Knee',type:'NORMAL',frameData:fd('sr_mk',7,4,13,46,7,13,9,false,5),meterGain:11,meterBlock:4},
+      {id:'sr_hk',name:'Seraph Kick',type:'NORMAL',frameData:fd('sr_hk',9,5,19,72,11,18,12,false,7),meterGain:15,meterBlock:6},
+      {id:'sr_sa',name:'Feather Barrage',type:'SPECIAL',
+        input:{seq:[2,3,6],btn:['LP','MP','HP'],win:30},isProjectile:true,
+        frameData:{id:'sr_sa',totalFrames:35,startupFrames:8,activeFrames:55,recoveryFrames:27,
+          hitboxes:[{rect:{x:0,y:-80,w:15,h:15},damage:32,guardDamage:10,hitstun:10,blockstun:7,knockdown:false,pushback:7,type:'PROJECTILE',priority:'SPECIAL'}],
+          hurtboxes:[{x:-20,y:-90,w:50,h:90}],cancelableInto:[],superCancelable:false},meterGain:16,meterBlock:8},
+      {id:'sr_sb',name:"Archangel's Descent",type:'SPECIAL',
+        input:{seq:[2,1,4],btn:['LP','MP','HP'],win:30},isAntiAir:true,
+        frameData:{id:'sr_sb',totalFrames:40,startupFrames:3,activeFrames:12,recoveryFrames:25,
+          hitboxes:[{rect:{x:5,y:-110,w:50,h:90},damage:80,guardDamage:15,hitstun:24,blockstun:14,knockdown:false,pushback:7,type:'MID',priority:'SPECIAL',launchY:-6}],
+          hurtboxes:[{x:0,y:-115,w:30,h:20}],cancelableInto:[],superCancelable:true},meterGain:26,meterBlock:9},
+      {id:'sr_sdm',name:'Wings of the Fallen',type:'SDM',meterCost:1,
+        input:{seq:[2,3,6,2,3,6],btn:['LK','MK','HK'],win:50},
+        frameData:{id:'sr_sdm',totalFrames:115,startupFrames:6,activeFrames:50,recoveryFrames:59,
+          hitboxes:[{rect:{x:-350,y:-150,w:800,h:140},damage:275,guardDamage:45,hitstun:42,blockstun:24,knockdown:true,pushback:0,type:'MID',priority:'SUPER',launchY:-9}],
+          hurtboxes:[],cancelableInto:[],superCancelable:false},meterGain:0,meterBlock:5},
+    ]
+  },
+  {
+    id:'inquisitor',name:'El Inquisidor',title:'The Inquisitor-Zealot',archetype:'PRESSURE',
+    stats:{maxHealth:950,walkSpeed:3.0,jumpHeight:13.5,weight:1.1,defense:0.95},
+    palette:{primary:'#18100a',secondary:'#382010',accent:'#7a6432',blood:'#c8a030',shadow:'#0c0804'},
+    spriteConfig:{bodyColor:'#201408',armorColor:'#382010',weaponColor:'#8a7020',eyeColor:'#e8c840',effectColor:'#c8a030',particleColor:'#e8a020'},
+    lore:'The Grand Inquisitor who tortured confessions of miraculous sin from a thousand penitents. His ritualistic chain-whip is consecrated in the blood of every heretic he has judged.',
+    moves:[
+      {id:'iq_lp',name:'Knuckle Grace',type:'NORMAL',frameData:fd('iq_lp',4,3,8,28,4,10,6,false,3),meterGain:8,meterBlock:3},
+      {id:'iq_mp',name:'Whip Crack',type:'NORMAL',frameData:fd('iq_mp',7,4,13,55,8,15,9,false,6),meterGain:13,meterBlock:5},
+      {id:'iq_hp',name:"Inquisitor's Verdict",type:'NORMAL',frameData:fd('iq_hp',10,5,19,84,13,21,14,false,8,'MID','NORMAL',-68,40),meterGain:19,meterBlock:8},
+      {id:'iq_lk',name:'Dress-Shoe Kick',type:'NORMAL',frameData:fd('iq_lk',5,3,9,24,3,9,5,false,2,'LOW'),meterGain:7,meterBlock:3},
+      {id:'iq_mk',name:'Boot Stomp',type:'NORMAL',frameData:fd('iq_mk',8,4,14,50,7,14,9,false,5),meterGain:11,meterBlock:4},
+      {id:'iq_hk',name:"Zealot's Sweep",type:'NORMAL',frameData:fd('iq_hk',11,5,21,78,11,19,12,false,7,'LOW'),meterGain:17,meterBlock:6},
+      {id:'iq_sa',name:'Inquisition Lash',type:'SPECIAL',
+        input:{seq:[2,3,6],btn:['LP','MP','HP'],win:30},isProjectile:true,
+        frameData:{id:'iq_sa',totalFrames:42,startupFrames:12,activeFrames:55,recoveryFrames:30,
+          hitboxes:[{rect:{x:0,y:-58,w:18,h:18},damage:40,guardDamage:16,hitstun:12,blockstun:9,knockdown:false,pushback:9,type:'PROJECTILE',priority:'SPECIAL'}],
+          hurtboxes:[{x:-20,y:-90,w:50,h:90}],cancelableInto:[],superCancelable:false},meterGain:18,meterBlock:9},
+      {id:'iq_sb',name:'Rising Judgment',type:'SPECIAL',
+        input:{seq:[2,1,4],btn:['LK','MK','HK'],win:30},isAntiAir:true,
+        frameData:{id:'iq_sb',totalFrames:44,startupFrames:3,activeFrames:9,recoveryFrames:32,
+          hitboxes:[{rect:{x:8,y:-115,w:52,h:95},damage:78,guardDamage:14,hitstun:25,blockstun:15,knockdown:false,pushback:7,type:'MID',priority:'SPECIAL',launchY:-5}],
+          hurtboxes:[{x:-5,y:-110,w:32,h:22}],cancelableInto:[],superCancelable:true},meterGain:26,meterBlock:9},
+      {id:'iq_sdm',name:'The Burning Verdict',type:'SDM',meterCost:1,
+        input:{seq:[2,3,6,4,1,2,3,6],btn:['LP','MP','HP'],win:60},
+        frameData:{id:'iq_sdm',totalFrames:125,startupFrames:10,activeFrames:55,recoveryFrames:60,
+          hitboxes:[{rect:{x:-400,y:-130,w:900,h:120},damage:290,guardDamage:50,hitstun:44,blockstun:26,knockdown:true,pushback:0,type:'MID',priority:'SUPER',launchY:-8}],
+          hurtboxes:[],cancelableInto:[],superCancelable:false},meterGain:0,meterBlock:5},
+    ]
+  }
+];
+
+// ── Fighter Factory ───────────────────────────────────────
+function createFighter(charId, startX, facingRight, isP1) {
+  const def = ROSTER.find(c=>c.id===charId);
+  return {
+    def, isP1, facingRight,
+    x:startX, y:GROUND_Y, vx:0, vy:0, grounded:true,
+    state:'IDLE', health:def.stats.maxHealth, stateFrame:0,
+    guardGauge:GUARD_MAX, powerCharge:0, powerStocks:0,
+    guardCrushed:false, guardCrushTimer:0,
+    hitStunTimer:0, knockdownTimer:0,
+    comboCount:0, comboTimer:0,
+    blockingHigh:false, blockingLow:false,
+    currentMove:null, lastHitFrame:-999,
+    projectiles:[],
+    buf:new InputBuffer(),
+    aiState:null,
+  };
+}
+
+// ── Physics ───────────────────────────────────────────────
+function stepPhysics(f) {
+  if(!f.grounded){
+    f.vy+=GRAVITY;
+    f.y+=f.vy;
+    f.x+=f.vx;
+    if(f.y>=GROUND_Y){f.y=GROUND_Y;f.vy=0;f.vx=0;f.grounded=true;}
+  }
+  f.x=Math.max(STAGE_L+18,Math.min(STAGE_R-18,f.x));
+}
+
+function worldRect(r, f) {
+  const x=f.facingRight?f.x+r.x:f.x-r.x-r.w;
+  return{x,y:f.y+r.y,w:r.w,h:r.h};
+}
+
+function rectsOverlap(a,b){
+  return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+}
+
+function getFighterHurtbox(f){
+  const isCrouch=f.state==='CROUCH'||f.state==='BLOCK_LOW';
+  const h=isCrouch?55:90,yo=isCrouch?-55:-90;
+  return{x:f.x-20,y:f.y+yo,w:45,h};
+}
+
+function resolvePush(f1,f2){
+  const p1={x:f1.x-18,y:f1.y-85,w:36,h:85};
+  const p2={x:f2.x-18,y:f2.y-85,w:36,h:85};
+  if(!rectsOverlap(p1,p2))return;
+  const mid=(f1.x+f2.x)/2,half=24;
+  f1.x=Math.max(STAGE_L+18,Math.min(STAGE_R-18,f1.x<f2.x?mid-half:mid+half));
+  f2.x=Math.max(STAGE_L+18,Math.min(STAGE_R-18,f2.x<f1.x?mid-half:mid+half));
+}
+
+// ── Hit Processing ────────────────────────────────────────
+let projIdCounter=0;
+function processHit(attacker, defender, frame) {
+  if(!attacker.currentMove)return false;
+  const fd=attacker.currentMove.frameData;
+  if(attacker.stateFrame<fd.startupFrames||attacker.stateFrame>=fd.startupFrames+fd.activeFrames)return false;
+  if(frame-attacker.lastHitFrame<3)return false;
+
+  const defHurt=getFighterHurtbox(defender);
+  for(const hb of fd.hitboxes){
+    if(hb.type==='PROJECTILE')continue;
+    const hitR=worldRect(hb.rect,attacker);
+    if(!rectsOverlap(hitR,defHurt))continue;
+
+    attacker.lastHitFrame=frame;
+    const facingAtt=defender.facingRight!==attacker.facingRight;
+    const isBlocking=facingAtt&&(defender.state==='BLOCK_HIGH'||defender.state==='BLOCK_LOW'||defender.blockingHigh||defender.blockingLow);
+
+    if(isBlocking&&hb.type!=='THROW'&&hb.type!=='UNBLOCKABLE'){
+      const highB=defender.state==='BLOCK_HIGH'||defender.blockingHigh;
+      const lowB=defender.state==='BLOCK_LOW'||defender.blockingLow;
+      const proper=hb.type==='LOW'?lowB:highB;
+      if(proper){
+        defender.guardGauge=Math.max(0,defender.guardGauge-hb.guardDamage);
+        if(defender.guardGauge<=0&&!defender.guardCrushed){
+          defender.guardCrushed=true;defender.guardCrushTimer=GUARD_CRUSH_DUR;
+          defender.state='HIT_STUN';defender.hitStunTimer=GUARD_CRUSH_DUR;
+        } else {
+          defender.hitStunTimer=hb.blockstun;
+          if(defender.state!=='GUARD_CRUSH')defender.state='HIT_STUN';
+        }
+        addMeter(attacker,attacker.currentMove.meterBlock||5);
+        spawnHitSpark(hitR.x+hitR.w/2,hitR.y+hitR.h/2,'GUARD');
+        // Pushback on block
+        const dir=defender.x>attacker.x?1:-1;
+        defender.x=Math.max(STAGE_L+18,Math.min(STAGE_R-18,defender.x+dir*hb.pushback*0.5));
+        attacker.x=Math.max(STAGE_L+18,Math.min(STAGE_R-18,attacker.x-dir*hb.pushback*0.3));
+        return false;
+      }
+    }
+
+    // Hit lands
+    const dmg=Math.floor(hb.damage*defender.def.stats.defense);
+    defender.health=Math.max(0,defender.health-dmg);
+    defender.comboCount++;
+    defender.comboTimer=180;
+
+    if(hb.knockdown){
+      defender.state='KNOCKDOWN';
+      defender.knockdownTimer=60;
+      if(hb.launchY) defender.vy=hb.launchY;
+      defender.grounded=false;
+    } else {
+      defender.state='HIT_STUN';
+      defender.hitStunTimer=hb.hitstun;
+    }
+
+    const dir=defender.x>attacker.x?1:-1;
+    defender.x=Math.max(STAGE_L+18,Math.min(STAGE_R-18,defender.x+dir*hb.pushback));
+
+    addMeter(attacker,attacker.currentMove.meterGain||15);
+    addMeter(defender,10);
+
+    const priority=hb.priority||'NORMAL';
+    const sparkType=priority==='SUPER'?'SUPER':priority==='SPECIAL'?'SPECIAL':'NORMAL';
+    spawnHitSpark(hitR.x+hitR.w/2,hitR.y+hitR.h/2,sparkType);
+    spawnBloodParticles(hitR.x+hitR.w/2,hitR.y+hitR.h/2,8,attacker.def.palette.blood);
+    screenShake=8;
+
+    if(hb.priority==='SUPER')superFlashTimer=20;
+
+    if(defender.health<=0){
+      defender.state='LOSE';
+      attacker.state='WIN';
+    }
+    return true;
+  }
+  return false;
+}
+
+function addMeter(f, amount) {
+  f.powerCharge+=amount;
+  while(f.powerCharge>=POWER_MAX&&f.powerStocks<POWER_STOCKS){
+    f.powerStocks++;f.powerCharge-=POWER_MAX;
+  }
+  if(f.powerStocks>=POWER_STOCKS)f.powerCharge=0;
+}
+
+// ── Projectile System ─────────────────────────────────────
+function spawnProjectile(f, move) {
+  const spd=f.facingRight?5:-5;
+  f.projectiles.push({
+    id:`proj_${++projIdCounter}`,
+    sprite:f.def.id+'_'+move.id,
+    x:f.x+(f.facingRight?30:-30), y:f.y-55,
+    vx:spd, vy:0,
+    hitboxData:move.frameData.hitboxes[0],
+    life:move.frameData.activeFrames||70,
+    frame:0, active:true,
+    ownerId:f.def.id
+  });
+}
+
+function stepProjectiles(f, enemy, frameN) {
+  f.projectiles=f.projectiles.filter(p=>p.active);
+  for(const p of f.projectiles){
+    p.x+=p.vx; p.y+=p.vy; p.frame++;
+    if(p.frame>=p.life||p.x<STAGE_L-100||p.x>STAGE_R+100){p.active=false;continue;}
+    // Hit check
+    const pr={x:p.x-12,y:p.y-12,w:24,h:24};
+    const eh=getFighterHurtbox(enemy);
+    if(rectsOverlap(pr,eh)&&enemy.state!=='LOSE'&&enemy.state!=='WIN'){
+      p.active=false;
+      const hb=p.hitboxData;
+      const dmg=Math.floor(hb.damage*enemy.def.stats.defense);
+      const facingAtt=enemy.facingRight!==f.facingRight;
+      const isBlocking=facingAtt&&(enemy.state==='BLOCK_HIGH'||enemy.state==='BLOCK_LOW'||enemy.blockingHigh||enemy.blockingLow);
+      if(isBlocking){
+        enemy.guardGauge=Math.max(0,enemy.guardGauge-hb.guardDamage);
+        enemy.hitStunTimer=hb.blockstun;
+        enemy.state='HIT_STUN';
+        spawnHitSpark(p.x,p.y,'GUARD');
+      } else {
+        enemy.health=Math.max(0,enemy.health-dmg);
+        enemy.comboCount++;enemy.comboTimer=180;
+        enemy.state='HIT_STUN';enemy.hitStunTimer=hb.hitstun;
+        addMeter(f,hb.damage*0.4);addMeter(enemy,10);
+        spawnHitSpark(p.x,p.y,'SPECIAL');
+        spawnBloodParticles(p.x,p.y,6,enemy.def.palette.blood);
+        screenShake=4;
+        if(enemy.health<=0){enemy.state='LOSE';f.state='WIN';}
+      }
+    }
+  }
+}
+
+// ── Effects ───────────────────────────────────────────────
+let particles=[], hitSparks=[], screenShake=0, superFlashTimer=0;
+let particleId=0, sparkId=0;
+
+function spawnBloodParticles(x,y,count,color) {
+  for(let i=0;i<count;i++){
+    particles.push({
+      id:particleId++,x,y,
+      vx:(Math.random()-0.5)*5,vy:(Math.random()-1)*5,
+      life:20+Math.random()*20,maxLife:40,
+      color,size:2+Math.random()*3,type:'BLOOD'
+    });
+  }
+}
+
+function spawnHitSpark(x,y,type) {
+  hitSparks.push({id:sparkId++,x,y,frame:0,maxFrame:type==='SUPER'?24:12,type});
+}
+
+function stepParticles() {
+  particles=particles.filter(p=>p.life>0);
+  for(const p of particles){
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.3;p.life--;
+  }
+  hitSparks=hitSparks.filter(s=>s.frame<s.maxFrame);
+  for(const s of hitSparks)s.frame++;
+  screenShake=Math.max(0,screenShake-1);
+  superFlashTimer=Math.max(0,superFlashTimer-1);
+}
+
+// ── Input → Move Logic ────────────────────────────────────
+function processInput(f, held, frame, enemy) {
+  if(f.state==='WIN'||f.state==='LOSE')return;
+  if(f.state==='KNOCKDOWN'||f.state==='GUARD_CRUSH'){
+    f.stateFrame++;
+    if(f.guardCrushed){f.guardCrushTimer--;if(f.guardCrushTimer<=0){f.guardCrushed=false;f.state='IDLE';f.stateFrame=0;}}
+    if(f.state==='KNOCKDOWN'&&f.grounded){f.knockdownTimer--;if(f.knockdownTimer<=0){f.state='IDLE';f.stateFrame=0;}}
+    return;
+  }
+
+  const dir=keysToNumpad(held,f.facingRight);
+  f.buf.updateDir(dir);
+  f.buf.tick(frame);
+
+  // Update facing
+  if(f.state==='IDLE'||f.state==='WALK_FORWARD'||f.state==='WALK_BACK'){
+    f.facingRight=f.x<enemy.x;
+  }
+
+  // --- Attack state progression ---
+  if(f.state==='PRE_ATTACK'||f.state==='ATTACKING'||f.state==='POST_ATTACK'){
+    f.stateFrame++;
+    const fd2=f.currentMove.frameData;
+    if(f.state==='PRE_ATTACK'&&f.stateFrame>=fd2.startupFrames){f.state='ATTACKING';}
+    if(f.state==='ATTACKING'&&f.stateFrame>=fd2.startupFrames+fd2.activeFrames){f.state='POST_ATTACK';}
+    if(f.state==='POST_ATTACK'&&f.stateFrame>=fd2.totalFrames){
+      f.state='IDLE';f.stateFrame=0;f.currentMove=null;
+    }
+    return;
+  }
+
+  // --- HIT_STUN ---
+  if(f.state==='HIT_STUN'){
+    f.stateFrame++;
+    f.hitStunTimer=Math.max(0,f.hitStunTimer-1);
+    if(f.hitStunTimer<=0&&f.grounded){f.state='IDLE';f.stateFrame=0;}
+    return;
+  }
+
+  // --- IDLE / WALKING / CROUCHING ---
+  f.state='IDLE';
+  f.stateFrame++;
+  if(f.comboTimer>0){f.comboTimer--;if(f.comboTimer<=0)f.comboCount=0;}
+
+  // Guard gauge regen
+  if(!held.left&&!held.right)f.guardGauge=Math.min(GUARD_MAX,f.guardGauge+0.12);
+
+  // Movement
+  if(dir===2||dir===1||dir===3){
+    f.state='CROUCH';
+    // Low block
+    const facingEnemy=(f.facingRight&&held.left)||(!f.facingRight&&held.right);
+    f.blockingLow=facingEnemy;f.blockingHigh=false;
+  } else if(dir===4&&f.facingRight||dir===6&&!f.facingRight){
+    // Walking back — high block
+    f.x+=f.facingRight?-2.6:2.6;f.state='WALK_BACK';
+    f.blockingHigh=true;f.blockingLow=false;
+  } else if(dir===6&&f.facingRight||dir===4&&!f.facingRight){
+    f.x+=f.facingRight?f.def.stats.walkSpeed:-f.def.stats.walkSpeed;f.state='WALK_FORWARD';
+    f.blockingHigh=false;f.blockingLow=false;
+  } else {
+    f.blockingHigh=false;f.blockingLow=false;
+  }
+
+  // Jump
+  if((dir===8||dir===9||dir===7)&&f.grounded){
+    const hspd=dir===9?3.5:dir===7?-3.5:0;
+    f.vy=-(f.def.stats.jumpHeight||JUMP_FORCE);f.vx=f.facingRight?hspd:-hspd;
+    f.grounded=false;f.state='JUMP';
+    f.blockingHigh=false;f.blockingLow=false;
+  }
+  if(!f.grounded)f.state='JUMP';
+
+  // --- Check special/super moves first ---
+  let moved=false;
+  for(const move of f.def.moves){
+    if(!move.input)continue;
+    const meterOk=!move.meterCost||(f.powerStocks>=move.meterCost);
+    if(!meterOk)continue;
+    const matched=f.buf.checkMotion(move.input.seq,move.input.btn,move.input.win);
+    if(matched){
+      f.buf.consumeButton(matched);
+      if(move.meterCost)f.powerStocks-=move.meterCost;
+      f.currentMove=move;
+      f.state='PRE_ATTACK';f.stateFrame=0;
+      // Projectile: spawn on active frame start
+      if(move.isProjectile){
+        // Will spawn when entering ATTACKING state
+        f._pendingProjectile=move;
+      }
+      if(move.type==='SDM')superFlashTimer=30;
+      moved=true;break;
+    }
+  }
+
+  // --- Normal moves ---
+  if(!moved){
+    const btnMap={
+      LP:{btn:'LP',ids:(id)=>f.def.moves.find(m=>m.id===id+'_lp')},
+      MP:{btn:'MP',ids:(id)=>f.def.moves.find(m=>m.id===id+'_mp')},
+      HP:{btn:'HP',ids:(id)=>f.def.moves.find(m=>m.id===id+'_hp')},
+      LK:{btn:'LK',ids:(id)=>f.def.moves.find(m=>m.id===id+'_lk')},
+      MK:{btn:'MK',ids:(id)=>f.def.moves.find(m=>m.id===id+'_mk')},
+      HK:{btn:'HK',ids:(id)=>f.def.moves.find(m=>m.id===id+'_hk')},
+    };
+    const pfx=f.def.id==='penitent'?'p':f.def.id==='martyr'?'mb':f.def.id==='oracle'?'or':f.def.id==='seraph'?'sr':'iq';
+    for(const [bname,bconf] of Object.entries(btnMap)){
+      const heldKey=bname.toLowerCase();
+      const recentBtn=[...f.buf.btns].reverse().find(e=>e.b===bname&&frame-e.f<=8);
+      if(recentBtn){
+        const move=bconf.ids(pfx);
+        if(move){
+          f.buf.consumeButton(bname);
+          f.currentMove=move;f.state='PRE_ATTACK';f.stateFrame=0;
+          break;
+        }
+      }
+    }
+  }
+
+  // Spawn pending projectile on attack frame
+  if(f._pendingProjectile&&f.state==='ATTACKING'&&f.stateFrame===f.currentMove?.frameData?.startupFrames){
+    spawnProjectile(f,f._pendingProjectile);
+    f._pendingProjectile=null;
+  }
+}
+
+function onKeyPress(code) {
+  if(gamePhase==='CHAR_SELECT'){handleCharSelectKey(code);return;}
+  if(gamePhase==='TITLE'){if(code==='Enter'||code==='Space'){startCharSelect();}return;}
+
+  // Register button presses for fighters
+  if(!gameState)return;
+  const p1btns={KeyU:'LP',KeyI:'MP',KeyO:'HP',KeyJ:'LK',KeyK:'MK',KeyL:'HK'};
+  const p2btns={KeyT:'LP',KeyY:'MP',KeyF:'HP',KeyG:'LK',KeyH:'MK',KeyB:'HK'};
+  if(p1btns[code])gameState.p1.buf.press(p1btns[code]);
+  if(gameMode!=='vsAI'&&p2btns[code])gameState.p2.buf.press(p2btns[code]);
+  if(gameMode==='online'&&isOnlineHost&&p2btns[code]&&conn)conn.send({type:'btn',btn:p2btns[code]});
+  if(gameMode==='online'&&!isOnlineHost&&p1btns[code]&&conn)conn.send({type:'btn',btn:p1btns[code]});
+}
+
+// ── AI System ─────────────────────────────────────────────
+function createAIState(diff){
+  return{diff,decisionTimer:0,plan:'IDLE',reactionDelay:diff==='EASY'?30:diff==='MEDIUM'?10:2,
+    lastObs:'IDLE',lastObsFrame:0,mixupMode:false,consecutiveBlocks:0};
+}
+
+function tickAI(ai, self, player, frame) {
+  ai.decisionTimer++;
+  if(ai.decisionTimer%3!==0)return ai.plan;
+  const dist=Math.abs(self.x-player.x);
+  const range=dist<80?'VERY_CLOSE':dist<180?'CLOSE':dist<350?'MID':'FAR';
+  const obsState=frame-ai.lastObsFrame>=ai.reactionDelay?player.state:(ai.lastObs||'IDLE');
+  ai.lastObs=obsState;ai.lastObsFrame=frame;
+
+  let action='IDLE';
+  if(ai.diff==='EASY'){
+    if(obsState==='ATTACKING'&&Math.random()<0.7){action=choose(['IDLE','WALK_FORWARD','LP','JUMP']);}
+    else if(range==='VERY_CLOSE'||range==='CLOSE'){action=choose(['LP','LP','LK','MP','WALK_BACK','JUMP']);}
+    else if(range==='MID'){action=choose(['WALK_FORWARD','WALK_FORWARD','IDLE','SPECIAL_A']);}
+    else action=choose(['WALK_FORWARD','IDLE']);
+  } else if(ai.diff==='MEDIUM'){
+    if(player.projectiles.some(p=>p.active)){action='JUMP';}
+    else if(obsState==='ATTACKING'){action=Math.random()<0.65?'BLOCK_HIGH':'LP';}
+    else if(obsState==='JUMP'||obsState==='JUMP_FORWARD'){action='SPECIAL_B';}
+    else if(range==='VERY_CLOSE'){action=choose(['LP','MP','HP','LK','MK','SPECIAL_B']);}
+    else if(range==='CLOSE'){action=choose(['MP','HP','MK','SPECIAL_A','SPECIAL_B']);}
+    else if(range==='MID'){action=choose(['WALK_FORWARD','SPECIAL_A','JUMP']);}
+    else action=choose(['WALK_FORWARD','SPECIAL_A']);
+    if(obsState==='BLOCK_LOW'&&Math.random()<0.7)action='HP';
+  } else { // HARD
+    if(player.projectiles.some(p=>p.active)){action='JUMP';}
+    else if(obsState==='ATTACKING'){action=Math.random()<0.88?'BLOCK_HIGH':'SPECIAL_B';}
+    else if(obsState==='JUMP'||obsState==='JUMP_FORWARD'){action='SPECIAL_B';}
+    else if(obsState==='BLOCK_LOW'&&Math.random()<0.85){action='HP';}
+    else if(self.powerStocks>=1&&range==='VERY_CLOSE'&&Math.random()<0.4){action='SUPER';}
+    else if(range==='VERY_CLOSE'){action=choose(['LP','MP','HP','SPECIAL_B','SPECIAL_C']);}
+    else if(range==='CLOSE'){action=choose(['MP','HP','SPECIAL_A','SPECIAL_B']);}
+    else if(range==='MID'){action=choose(['WALK_FORWARD','SPECIAL_A','JUMP_FORWARD']);}
+    else action=choose(['WALK_FORWARD','SPECIAL_A']);
+  }
+  ai.plan=action;
+  return action;
+}
+
+function choose(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+function applyAIAction(action, f, enemy, frame) {
+  const fr=f.facingRight;
+  const held={up:false,down:false,left:false,right:false,
+    lp:false,mp:false,hp:false,lk:false,mk:false,hk:false};
+
+  switch(action){
+    case 'WALK_FORWARD':held[fr?'right':'left']=true;break;
+    case 'WALK_BACK':held[fr?'left':'right']=true;break;
+    case 'JUMP':held.up=true;break;
+    case 'JUMP_FORWARD':held.up=true;held[fr?'right':'left']=true;break;
+    case 'CROUCH':held.down=true;break;
+    case 'BLOCK_HIGH':held[fr?'left':'right']=true;break;
+    case 'BLOCK_LOW':held.down=true;held[fr?'left':'right']=true;break;
+    case 'LP':f.buf.press('LP');break;
+    case 'MP':f.buf.press('MP');break;
+    case 'HP':f.buf.press('HP');break;
+    case 'LK':f.buf.press('LK');held.down=true;break;
+    case 'MK':f.buf.press('MK');break;
+    case 'HK':f.buf.press('HK');break;
+    case 'SPECIAL_A':
+      f.buf.updateDir(2);f.buf.updateDir(3);f.buf.updateDir(6);
+      f.buf.press('LP');break;
+    case 'SPECIAL_B':
+      f.buf.updateDir(2);f.buf.updateDir(1);f.buf.updateDir(4);
+      f.buf.press('LP');break;
+    case 'SPECIAL_C':
+      f.buf.updateDir(2);f.buf.updateDir(3);f.buf.updateDir(6);
+      f.buf.press('LK');break;
+    case 'SUPER':
+      f.buf.updateDir(2);f.buf.updateDir(3);f.buf.updateDir(6);
+      f.buf.updateDir(2);f.buf.updateDir(3);f.buf.updateDir(6);
+      f.buf.press('HP');break;
+  }
+  f.buf.tick(frame);
+  return held;
+}
+
+// ── Round System ──────────────────────────────────────────
+let roundState={round:1,p1Wins:0,p2Wins:0,timer:ROUND_FRAMES,phase:'FIGHTING',phaseTimer:0,winner:null,koText:''};
+
+function initRound() {
+  const p1char=ROSTER[p1SelIdx].id, p2char=ROSTER[p2SelIdx].id;
+  const p1=createFighter(p1char,220,true,true);
+  const p2=createFighter(p2char,670,false,false);
+  if(gameMode==='vsAI'||gameMode==='online'){
+    p2.aiState=createAIState(aiDifficulty);
+    p2.isAI=true;
+  }
+  gameState={p1,p2};
+  roundState.timer=ROUND_FRAMES;
+  roundState.phase='ANNOUNCE';
+  roundState.phaseTimer=90;
+  particles=[];hitSparks=[];screenShake=0;
+  frameCount=0;
+}
+
+function initGame() {
+  roundState={round:1,p1Wins:0,p2Wins:0,timer:ROUND_FRAMES,phase:'ANNOUNCE',phaseTimer:90,winner:null,koText:''};
+  initRound();
+}
+
+// ── Char Select ───────────────────────────────────────────
+function startCharSelect() {
+  gamePhase='CHAR_SELECT';
+  p1SelIdx=0;p2SelIdx=1;
+}
+
+function handleCharSelectKey(code) {
+  if(code==='ArrowLeft'){p1SelIdx=(p1SelIdx-1+ROSTER.length)%ROSTER.length;}
+  if(code==='ArrowRight'){p1SelIdx=(p1SelIdx+1)%ROSTER.length;}
+  if(code==='KeyA'&&gameMode!=='vsAI'){p2SelIdx=(p2SelIdx-1+ROSTER.length)%ROSTER.length;}
+  if(code==='KeyD'&&gameMode!=='vsAI'){p2SelIdx=(p2SelIdx+1)%ROSTER.length;}
+  if(code==='Enter'||code==='Space'){
+    gamePhase='FIGHTING';
+    initGame();
+    document.getElementById('mainMenu').classList.add('hidden');
+  }
+}
+
+// ── Game Loop ─────────────────────────────────────────────
+function gameLoop() {
+  rafId=requestAnimationFrame(gameLoop);
+  if(paused){renderPaused();return;}
+
+  // Online: send local inputs to peer
+  if(gameMode==='online'&&conn&&onlineReady){
+    const localHeld=getHeld(isOnlineHost?P1_MAP:P2_MAP);
+    conn.send({type:'held',held:localHeld,frame:frameCount});
+  }
+
+  if(gamePhase==='TITLE'){renderTitle(frameCount++);return;}
+  if(gamePhase==='CHAR_SELECT'){renderCharSelect(frameCount++);return;}
+  if(!gameState){renderTitle(frameCount++);return;}
+
+  const {p1,p2}=gameState;
+  frameCount++;
+
+  // Phase management
+  if(roundState.phase==='ANNOUNCE'){
+    roundState.phaseTimer--;
+    if(roundState.phaseTimer<=0)roundState.phase='FIGHTING';
+  }
+
+  if(roundState.phase==='FIGHTING'){
+    roundState.timer=Math.max(0,roundState.timer-1);
+
+    // Process P1 input
+    const p1held=gameMode==='online'&&!isOnlineHost?remoteInputs:getHeld(P1_MAP);
+    processInput(p1,p1held,frameCount,p2);
+
+    // Process P2 input
+    let p2held;
+    if(p2.isAI||gameMode==='vsAI'){
+      const aiAction=tickAI(p2.aiState,p2,p1,frameCount);
+      p2held=applyAIAction(aiAction,p2,p1,frameCount);
+    } else if(gameMode==='online'&&isOnlineHost){
+      p2held=remoteInputs;
+    } else {
+      p2held=getHeld(P2_MAP);
+    }
+    processInput(p2,p2held,frameCount,p1);
+
+    // Physics
+    stepPhysics(p1);stepPhysics(p2);
+    resolvePush(p1,p2);
+
+    // Spawn pending projectile check
+    if(p1._pendingProjectile&&p1.state==='ATTACKING'&&p1.stateFrame===p1.currentMove?.frameData?.startupFrames){
+      spawnProjectile(p1,p1._pendingProjectile);p1._pendingProjectile=null;
+    }
+    if(p2._pendingProjectile&&p2.state==='ATTACKING'&&p2.stateFrame===p2.currentMove?.frameData?.startupFrames){
+      spawnProjectile(p2,p2._pendingProjectile);p2._pendingProjectile=null;
+    }
+
+    // Hit detection
+    processHit(p1,p2,frameCount);
+    processHit(p2,p1,frameCount);
+
+    // Projectile step
+    stepProjectiles(p1,p2,frameCount);
+    stepProjectiles(p2,p1,frameCount);
+
+    // Guard gauge regen
+    p1.guardGauge=Math.min(GUARD_MAX,p1.guardGauge+(p1.state!=='HIT_STUN'?0.08:0));
+    p2.guardGauge=Math.min(GUARD_MAX,p2.guardGauge+(p2.state!=='HIT_STUN'?0.08:0));
+
+    // Check KO / time out
+    const p1Dead=p1.health<=0||p1.state==='LOSE';
+    const p2Dead=p2.health<=0||p2.state==='LOSE';
+    if(p1Dead||p2Dead||roundState.timer<=0){
+      roundState.phase='KO';
+      roundState.phaseTimer=120;
+      if(p2Dead&&!p1Dead){roundState.winner='P1';roundState.p1Wins++;roundState.koText='K.O.!';}
+      else if(p1Dead&&!p2Dead){roundState.winner='P2';roundState.p2Wins++;roundState.koText='K.O.!';}
+      else if(p1Dead&&p2Dead){roundState.winner='DRAW';roundState.koText='DOUBLE K.O.!';}
+      else{
+        roundState.winner=p1.health>p2.health?'P1':'P2';
+        if(roundState.winner==='P1')roundState.p1Wins++;else roundState.p2Wins++;
+        roundState.koText='TIME!';
+      }
+      p1.state=p2Dead&&!p1Dead?'WIN':p1Dead?'LOSE':'WIN';
+      p2.state=p1Dead&&!p2Dead?'WIN':p2Dead?'LOSE':'WIN';
+    }
+  }
+
+  if(roundState.phase==='KO'){
+    roundState.phaseTimer--;
+    if(roundState.phaseTimer<=0){
+      if(roundState.p1Wins>=2||roundState.p2Wins>=2){roundState.phase='GAME_OVER';}
+      else{roundState.round++;initRound();}
+    }
+  }
+
+  stepParticles();
+  render();
+}
+
+// ── Renderer ──────────────────────────────────────────────
+function render(){
+  const {p1,p2}=gameState||{};
+  const shakeX=screenShake>0?(Math.random()-0.5)*screenShake:0;
+  const shakeY=screenShake>0?(Math.random()-0.5)*screenShake:0;
+
+  ctx.save();
+  ctx.translate(Math.round(shakeX),Math.round(shakeY));
+
+  // Super flash
+  if(superFlashTimer>0){
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.fillRect(-10,-10,W+20,H+20);
+  }
+
+  renderStage(frameCount);
+
+  if(p1&&p2){
+    renderProjectilesAll([...p1.projectiles,...p2.projectiles]);
+    renderFighter(p1,frameCount);
+    renderFighter(p2,frameCount);
+    renderParticlesAll();
+    renderHitSparksAll();
+  }
+
+  ctx.restore();
+  if(p1&&p2) renderHUD();
+  renderAnnouncement();
+}
+
+function renderPaused(){
+  ctx.fillStyle='rgba(4,2,10,0.7)';
+  ctx.fillRect(0,0,W,H);
+}
+
+// ── Stage ─────────────────────────────────────────────────
+function renderStage(frame) {
+  // Sky
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#060210');sky.addColorStop(0.4,'#0d0818');
+  sky.addColorStop(0.7,'#180a14');sky.addColorStop(1,'#0a0608');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+
+  // Stained glass windows
+  const wins=[{x:80,w:90,h:180},{x:280,w:70,h:150},{x:W-170,w:70,h:150},{x:W-340,w:90,h:180}];
+  wins.forEach((win,i)=>{
+    const fl=0.6+0.4*Math.sin(frame*0.02+i*1.3);
+    px(win.x,30,win.w,win.h,'#1a0808');
+    const panels=[
+      {c:`rgba(120,20,20,${0.6*fl})`,dx:0,dy:0,pw:win.w/2,ph:win.h/3},
+      {c:`rgba(80,10,60,${0.5*fl})`,dx:win.w/2,dy:0,pw:win.w/2,ph:win.h/3},
+      {c:`rgba(20,20,100,${0.6*fl})`,dx:0,dy:win.h/3,pw:win.w,ph:win.h/3},
+      {c:`rgba(100,60,10,${0.5*fl})`,dx:0,dy:(win.h*2)/3,pw:win.w/2,ph:win.h/3},
+      {c:`rgba(60,10,10,${0.6*fl})`,dx:win.w/2,dy:(win.h*2)/3,pw:win.w/2,ph:win.h/3},
+    ];
+    panels.forEach(p2=>{ctx.fillStyle=p2.c;ctx.fillRect(win.x+p2.dx+3,33+p2.dy,p2.pw-3,p2.ph-2);});
+    ctx.fillStyle='#0a0408';ctx.fillRect(win.x+win.w/2-1,30,2,win.h);
+    ctx.fillRect(win.x,30+win.h/3-1,win.w,2);ctx.fillRect(win.x,30+(win.h*2)/3-1,win.w,2);
+  });
+
+  // Columns
+  [50,200,W-200,W-50].forEach(cx=>{
+    const g=ctx.createLinearGradient(cx-18,0,cx+18,0);
+    g.addColorStop(0,'#1a1420');g.addColorStop(0.3,'#2a2030');
+    g.addColorStop(0.7,'#221828');g.addColorStop(1,'#100c14');
+    ctx.fillStyle=g;ctx.fillRect(cx-18,0,36,GROUND_Y+40);
+    px(cx-22,40,44,20,'#2a2232');
+    // Gargoyle
+    px(cx-6,28,12,10,'#1e1830');px(cx-3,20,6,10,'#1a1428');
+    px(cx-8,32,3,3,'#2a2040');px(cx+5,32,3,3,'#2a2040');
+    px(cx-7,16,2,7,'#141020');px(cx+5,16,2,7,'#141020');
+    // Stone lines
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    for(let y=60;y<GROUND_Y;y+=25)ctx.fillRect(cx-17,y,34,1);
+  });
+
+  // Floor
+  const fl=ctx.createLinearGradient(0,GROUND_Y,0,H);
+  fl.addColorStop(0,'#201820');fl.addColorStop(0.3,'#181018');fl.addColorStop(1,'#100c10');
+  ctx.fillStyle=fl;ctx.fillRect(0,GROUND_Y,W,H-GROUND_Y);
+  ctx.fillStyle='rgba(0,0,0,0.4)';
+  for(let tx=STAGE_L;tx<STAGE_R;tx+=80){ctx.fillRect(tx,GROUND_Y,1,H-GROUND_Y);}
+  for(let ty=GROUND_Y;ty<H;ty+=50){ctx.fillRect(STAGE_L,ty,STAGE_R-STAGE_L,1);}
+
+  // Candles
+  [130,270,420,560,700,840].forEach((cx,i)=>{
+    const fl2=0.7+0.3*Math.sin(frame*0.1+i*0.8);
+    px(cx-3,GROUND_Y-30,6,30,'#c0b8a8');
+    ctx.fillStyle=`rgba(255,180,20,${fl2*0.7})`;ctx.fillRect(cx-4,GROUND_Y-38,8,8);
+    ctx.fillStyle=`rgba(255,220,80,${fl2})`;ctx.fillRect(cx-1,GROUND_Y-42,2,5);
+    // Light pool
+    const rg=ctx.createRadialGradient(cx,GROUND_Y-35,0,cx,GROUND_Y-35,40);
+    rg.addColorStop(0,`rgba(255,180,50,${0.05*fl2})`);rg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=rg;ctx.fillRect(cx-40,GROUND_Y-75,80,80);
+  });
+
+  // Blood pool
+  ctx.fillStyle='rgba(100,10,10,0.3)';
+  ctx.fillRect(280,GROUND_Y-1,100,4);
+  ctx.fillRect(500,GROUND_Y-1,60,3);
+
+  // Fog
+  const fog=ctx.createLinearGradient(0,GROUND_Y-60,0,GROUND_Y+20);
+  fog.addColorStop(0,'rgba(20,10,30,0)');fog.addColorStop(1,'rgba(20,10,30,0.4)');
+  ctx.fillStyle=fog;ctx.fillRect(0,GROUND_Y-60,W,80);
+}
+
+// ── Fighter Renderer ──────────────────────────────────────
+function renderFighter(f, frame) {
+  const {x,y,facingRight}=f;
+  const cfg=f.def.spriteConfig;
+  const state=f.state;
+  const sf=f.stateFrame;
+
+  ctx.save();
+  if(!facingRight){ctx.scale(-1,1);ctx.translate(-2*x,0);}
+
+  // Shadow
+  const sha=f.grounded?0.4:0.2, shw=f.grounded?40:25;
+  const sg=ctx.createRadialGradient(x,y+2,0,x,y+2,shw);
+  sg.addColorStop(0,`rgba(0,0,0,${sha})`);sg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=sg;ctx.fillRect(x-shw,y-3,shw*2,10);
+
+  switch(f.def.id){
+    case 'penitent': drawPenitent(x,y,sf,state,cfg,frame);break;
+    case 'martyr': drawMartyr(x,y,sf,state,cfg,frame);break;
+    case 'oracle': drawOracle(x,y,sf,state,cfg,frame);break;
+    case 'seraph': drawSeraph(x,y,sf,state,cfg,frame);break;
+    case 'inquisitor': drawInquisitor(x,y,sf,state,cfg,frame);break;
+  }
+
+  // Hit flash
+  if(state==='HIT_STUN'&&sf%4<2){ctx.globalAlpha=0.5;ctx.fillStyle='#ffffff';ctx.fillRect(x-25,y-90,50,90);ctx.globalAlpha=1;}
+  // Super flash
+  if(state==='PRE_ATTACK'&&f.currentMove?.type==='SDM'&&sf<8){ctx.globalAlpha=0.7;ctx.fillStyle='#ffffff';ctx.fillRect(x-30,y-100,60,100);ctx.globalAlpha=1;}
+
+  ctx.restore();
+
+  // Guard crush text
+  if(f.guardCrushed){
+    ctx.save();const a=0.5+0.5*Math.sin(frame*0.3);
+    ctx.fillStyle=`rgba(100,200,255,${a})`;ctx.font='bold 10px monospace';ctx.textAlign='center';
+    ctx.fillText('GUARD CRUSH!',x,y-100);ctx.restore();
+  }
+  // Combo counter
+  if(f.comboCount>=2){
+    ctx.save();ctx.fillStyle='#e8c040';ctx.font=`bold ${10+f.comboCount}px monospace`;
+    ctx.textAlign='center';ctx.fillText(`${f.comboCount} HITS`,x,y-110);ctx.restore();
+  }
+}
+
+// ── Character Drawings ─────────────────────────────────────
+function drawPenitent(x,y,sf,state,cfg,frame){
+  const bob=state==='IDLE'?Math.sin(frame*0.06)*2:0;
+  const oy=y+bob;
+  const lp=state==='WALK_FORWARD'||state==='WALK_BACK'?sf:0;
+  const ll=Math.sin(lp*0.4)*5,rl=-ll;
+  px(x-12,oy-30+ll,10,30,cfg.armorColor);px(x+2,oy-30+rl,10,30,cfg.armorColor);
+  px(x-14,oy-4+ll,14,6,'#2a1810');px(x,oy-4+rl,14,6,'#2a1810');
+  const ty=oy-65;
+  px(x-16,ty,32,35,cfg.armorColor);
+  px(x-1,ty+5,2,15,cfg.effectColor);px(x-6,ty+10,12,2,cfg.effectColor);
+  const as=state==='ATTACKING'?Math.min(sf*8,30):0;
+  px(x-22,ty+5,8,20,cfg.armorColor);px(x+14,ty+5-as,8,20,cfg.armorColor);
+  const ht=state==='CROUCH'?-2:0;
+  px(x-2,ty-50+ht,4,10,cfg.armorColor);px(x-5,ty-40+ht,10,10,cfg.armorColor);
+  px(x-8,ty-30+ht,16,10,cfg.armorColor);px(x-10,ty-20+ht,20,12,cfg.armorColor);
+  px(x-6,ty-22+ht,12,3,cfg.eyeColor);
+  px(x-12,ty-8,24,4,'#4a3830');
+  const sw=x+22,sv=ty+8+(-as);
+  px(sw,sv,4,40,cfg.weaponColor);px(sw+1,sv-15,2,20,'#a08080');
+  px(sw-5,sv+5,14,4,'#6a4040');
+  for(let b=0;b<4;b++){px(sw+4,sv+8+b*8,5,2,'#8a2020');px(sw-3,sv+12+b*8,5,2,'#8a2020');}
+  if(state==='ATTACKING'&&sf>3){ctx.fillStyle='#cc2222';ctx.fillRect(sw+2,sv+35,2,8);}
+}
+
+function drawMartyr(x,y,sf,state,cfg,frame){
+  const bob=state==='IDLE'?Math.sin(frame*0.05)*1.5:0;
+  const oy=y+bob;
+  px(x-22,oy-80,44,80,cfg.bodyColor);px(x-10,oy-95,35,20,cfg.bodyColor);
+  px(x-24,oy-75,6,60,'#2a1808');px(x+18,oy-70,8,55,'#2a1808');
+  px(x-14,oy-100,28,22,'#3a2010');px(x-10,oy-108,20,10,'#3a2010');
+  px(x-8,oy-100,5,4,cfg.eyeColor);px(x+3,oy-100,5,4,cfg.eyeColor);
+  const cs=state==='ATTACKING'?sf*4:0;
+  [{ox:-18,oy2:-60},{ox:-10,oy2:-40},{ox:15,oy2:-50},{ox:20,oy2:-30}].forEach(cp=>{
+    ctx.fillStyle=cfg.weaponColor;ctx.fillRect(x+cp.ox,oy+cp.oy2,3,20+cs);
+    for(let t=0;t<3;t++){ctx.fillStyle='#2a3a1a';ctx.fillRect(x+cp.ox-3,oy+cp.oy2+t*6,9,2);}
+  });
+  ctx.fillStyle=cfg.effectColor;
+  ctx.fillRect(x-5,oy-70,10,3);ctx.fillRect(x+8,oy-55,8,2);ctx.fillRect(x-15,oy-45,6,4);
+  const lp=state==='WALK_FORWARD'?sf:0;
+  px(x-18,oy-28+Math.sin(lp*0.3)*4,16,28,cfg.bodyColor);
+  px(x+2,oy-28-Math.sin(lp*0.3)*4,16,28,cfg.bodyColor);
+}
+
+function drawOracle(x,y,sf,state,cfg,frame){
+  const float=Math.sin(frame*0.07)*5;
+  const oy=y-15+float;
+  const sway=Math.sin(frame*0.05)*3;
+  px(x-15+sway,oy-20,30,25,cfg.armorColor);
+  for(let r=0;r<5;r++){
+    const rw=22-r*2,rx=x-rw/2+sway*(1-r*0.1);
+    px(rx,oy-20+r*6,rw,7,r%2===0?cfg.armorColor:cfg.bodyColor);
+  }
+  px(x-8+sway*0.5,oy+15,16,20,cfg.bodyColor);
+  px(x-12,oy-60,24,40,cfg.armorColor);
+  px(x-1,oy-55,2,12,cfg.effectColor);px(x-5,oy-50,10,2,cfg.effectColor);
+  px(x-10,oy-85,20,25,'#d4c8b0');px(x-7,oy-90,14,8,'#c8bca8');
+  px(x-8,oy-82,6,5,'#1a0a0a');px(x+2,oy-82,6,5,'#1a0a0a');
+  ctx.fillStyle=cfg.eyeColor;ctx.fillRect(x-5,oy-77,2,10);ctx.fillRect(x+5,oy-77,2,10);
+  px(x-12,oy-90,24,10,cfg.armorColor);
+  // Orbiting icons
+  for(let i=0;i<3;i++){
+    const ang=frame*0.04+(i*Math.PI*2)/3;
+    const ix=x+Math.cos(ang)*35,iy=(oy-50)+Math.sin(ang)*15;
+    const is=8+Math.sin(frame*0.1+i)*2;
+    ctx.fillStyle=cfg.effectColor;ctx.fillRect(ix-is/2,iy-is/2,is,is);
+    ctx.fillStyle=cfg.weaponColor;ctx.fillRect(ix-1,iy-is/2+1,2,is-2);ctx.fillRect(ix-is/2+1,iy-1,is-2,2);
+    ctx.fillStyle='#aa1a1a';ctx.fillRect(ix,iy+is/2,1,5);
+  }
+  const ae=state==='ATTACKING'?Math.min(sf*3,20):0;
+  px(x-22,oy-58,10,18,cfg.armorColor);px(x+12+ae,oy-58,10,18,cfg.armorColor);
+}
+
+function drawSeraph(x,y,sf,state,cfg,frame){
+  const bob=Math.sin(frame*0.08)*2;
+  const oy=y+bob;
+  const ws=state==='JUMP'?1.4:state==='ATTACKING'?1.2:1.0;
+  const wf=state==='JUMP'?Math.sin(frame*0.2)*8:0;
+  // Wings
+  ctx.fillStyle='#2a3a5a';
+  ctx.beginPath();ctx.moveTo(x-15,oy-70);ctx.lineTo(x-15-35*ws,oy-80+wf);
+  ctx.lineTo(x-15-50*ws,oy-50);ctx.lineTo(x-15-30*ws,oy-20);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#2a3a5a';
+  ctx.beginPath();ctx.moveTo(x+15,oy-70);ctx.lineTo(x+15+35*ws,oy-80+wf);
+  ctx.lineTo(x+15+50*ws,oy-50);ctx.lineTo(x+15+30*ws,oy-20);ctx.closePath();ctx.fill();
+  // Wing bone spines
+  ctx.strokeStyle='#1a2a4a';ctx.lineWidth=1;
+  [[x-15-35*ws,oy-80+wf],[x-15-50*ws,oy-50],[x-15-30*ws,oy-20]].forEach(p=>{
+    ctx.beginPath();ctx.moveTo(x-15,oy-70);ctx.lineTo(p[0],p[1]);ctx.stroke();
+  });
+  // Body
+  px(x-14,oy-80,28,50,cfg.armorColor);
+  px(x-16,oy-40,6,40,cfg.bodyColor);px(x+10,oy-35,7,35,cfg.bodyColor);
+  // Head
+  px(x-9,oy-95,18,18,cfg.armorColor);px(x-6,oy-100,12,8,'#c0c8d8');
+  [{ex:x-6,ey:oy-92},{ex:x+2,ey:oy-92},{ex:x-3,ey:oy-86}].forEach(ep=>{px(ep.ex,ep.ey,4,4,cfg.eyeColor);});
+  // Multi-arms + spears
+  const aa=state==='ATTACKING'?Math.min(sf*5,25):0;
+  [{ax:x-22,ay:oy-72,dir:-1,vert:-aa},{ax:x+14,ay:oy-72,dir:1,vert:-aa},
+   {ax:x-20,ay:oy-55,dir:-1,vert:aa/2},{ax:x+12,ay:oy-55,dir:1,vert:aa/2}].forEach(arm=>{
+    px(arm.ax,arm.ay,8,18,cfg.armorColor);
+    const sl=35;const sx=arm.ax+(arm.dir>0?8:-sl+8);
+    ctx.fillStyle='#6a5040';ctx.fillRect(sx,arm.ay+arm.vert,arm.dir>0?sl:-sl,3);
+    ctx.fillStyle='#4a3830';ctx.fillRect(arm.dir>0?sx+sl-6:sx-6,arm.ay+arm.vert-2,8,7);
+  });
+}
+
+function drawInquisitor(x,y,sf,state,cfg,frame){
+  const bob=state==='IDLE'?Math.sin(frame*0.06)*1.5:0;
+  const oy=y+bob;
+  const lp=state==='WALK_FORWARD'||state==='WALK_BACK'?sf:0;
+  const ll=Math.sin(lp*0.4)*4;
+  px(x-11,oy-30+ll,9,30,'#1a1008');px(x+2,oy-30-ll,9,30,'#1a1008');
+  px(x-13,oy-3+ll,13,5,'#100808');px(x,oy-3-ll,13,5,'#100808');
+  px(x-14,oy-65,28,35,cfg.bodyColor);
+  px(x-10,oy-65,8,25,'#201408');px(x+2,oy-65,8,25,'#201408');
+  px(x-3,oy-55,6,6,cfg.effectColor);px(x-1,oy-57,2,10,cfg.effectColor);
+  px(x-9,oy-85,18,22,'#e8d8b8');
+  px(x-5,oy-80,10,4,cfg.eyeColor);px(x-4,oy-79,8,3,'#0a0804');
+  px(x-12,oy-88,24,6,cfg.bodyColor);px(x-10,oy-92,20,8,cfg.bodyColor);
+  px(x-14,oy-87,28,3,'#100c08');
+  px(x-22,oy-60,8,22,cfg.bodyColor);px(x+14,oy-60,8,22,cfg.bodyColor);
+  px(x-24,oy-40,10,10,'#e8e0d0');px(x+14,oy-40,10,10,'#e8e0d0');
+  // Chain whip
+  const ws=state==='ATTACKING'?Math.min(sf*6,40):0;
+  const wx=x+24+ws,wbx=x+18;
+  for(let c=0;c<6;c++){
+    const lx=wbx+c*((wx-wbx)/6),ly=oy-38+Math.sin(c*0.6+sf*0.3)*(c*2);
+    ctx.fillStyle=cfg.weaponColor;ctx.fillRect(lx,ly,5,4);
+    if(c%2===0){ctx.fillStyle=cfg.effectColor;ctx.fillRect(lx+1,ly-3,3,3);}
+  }
+  ctx.fillStyle='#aa2a0a';ctx.fillRect(wx-3,oy-38+Math.sin(sf*0.5)*6-2,8,5);
+}
+
+// ── Projectile Renderer ───────────────────────────────────
+function renderProjectilesAll(projs){
+  projs.forEach(p=>{
+    if(!p.active)return;
+    const pulse=0.8+0.2*Math.sin(frameCount*0.2);
+    if(p.sprite.includes('penitent')){
+      px(p.x-10,p.y-10,20,20,'#3a2010');
+      ctx.fillStyle=`rgba(139,26,26,${pulse})`;ctx.fillRect(p.x-7,p.y-7,14,14);
+      for(let s=0;s<8;s++){const a=(s/8)*Math.PI*2+frameCount*0.1;ctx.fillStyle='#2a1808';ctx.fillRect(p.x+Math.cos(a)*10-1,p.y+Math.sin(a)*10-1,2,2);}
+    } else if(p.sprite.includes('oracle')){
+      ctx.fillStyle=`rgba(100,30,140,${pulse})`;ctx.fillRect(p.x-9,p.y-9,18,18);
+      ctx.fillStyle='#d4c8b0';ctx.fillRect(p.x-1,p.y-7,2,14);ctx.fillRect(p.x-5,p.y-3,10,2);
+      ctx.fillStyle='#aa1a1a';ctx.fillRect(p.x,p.y+7,1,5);
+    } else if(p.sprite.includes('seraph')){
+      ctx.fillStyle=`rgba(200,210,230,${pulse*0.8})`;
+      for(let f2=0;f2<3;f2++)ctx.fillRect(p.x-2+f2*4,p.y-6+f2*3,3,12);
+    } else if(p.sprite.includes('inquisitor')){
+      ctx.fillStyle=`rgba(200,160,20,${pulse})`;ctx.fillRect(p.x-12,p.y-6,24,12);
+      ctx.fillStyle=`rgba(255,200,50,${pulse*0.7})`;ctx.fillRect(p.x-8,p.y-4,16,8);
+    } else {
+      ctx.fillStyle=`rgba(80,100,120,${pulse})`;ctx.fillRect(p.x-12,p.y-12,24,24);
+      ctx.fillStyle='#2a3a1a';ctx.fillRect(p.x-8,p.y-8,16,16);
+    }
+  });
+}
+
+function renderParticlesAll(){
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/p.maxLife;ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+  });ctx.globalAlpha=1;
+}
+
+function renderHitSparksAll(){
+  hitSparks.forEach(s=>{
+    const a=1-s.frame/s.maxFrame;
+    const sz=s.type==='SUPER'?30:s.type==='SPECIAL'?18:12;
+    ctx.globalAlpha=a;
+    if(s.type==='GUARD'){
+      ctx.fillStyle='#4488ff';
+      for(let i=0;i<6;i++){const ang=(i/6)*Math.PI*2+s.frame*0.3;ctx.fillRect(s.x+Math.cos(ang)*sz*0.5-2,s.y+Math.sin(ang)*sz*0.5-2,4,4);}
+    } else if(s.type==='SUPER'){
+      ctx.fillStyle='#ffffff';ctx.fillRect(s.x-sz,s.y-4,sz*2,8);ctx.fillRect(s.x-4,s.y-sz,8,sz*2);
+      ctx.fillStyle='#ffcc00';ctx.fillRect(s.x-sz*0.7,s.y-3,sz*1.4,6);ctx.fillRect(s.x-3,s.y-sz*0.7,6,sz*1.4);
+    } else if(s.type==='SPECIAL'){
+      ctx.fillStyle='#ff8800';
+      for(let i=0;i<8;i++){const ang=(i/8)*Math.PI*2+s.frame*0.2;const l=sz*(0.5+0.5*Math.sin(s.frame*0.4));ctx.fillRect(s.x+Math.cos(ang)*l-3,s.y+Math.sin(ang)*l-3,6,6);}
+    } else {
+      ctx.fillStyle='#ffff88';ctx.fillRect(s.x-8,s.y-3,16,6);ctx.fillRect(s.x-3,s.y-8,6,16);
+      ctx.fillStyle='#ffffff';ctx.fillRect(s.x-4,s.y-4,8,8);
+    }
+  });ctx.globalAlpha=1;
+}
+
+// ── HUD ───────────────────────────────────────────────────
+function renderHUD(){
+  const {p1,p2}=gameState;
+  // P1 health
+  const p1hp=p1.health/p1.def.stats.maxHealth;
+  const p2hp=p2.health/p2.def.stats.maxHealth;
+  const barW=320,barH=18,barY=14;
+
+  // Health bar backgrounds
+  px(20,barY,barW,barH,'#0a0508');px(W-20-barW,barY,barW,barH,'#0a0508');
+
+  // Health fill P1
+  const p1c=p1hp>0.5?PALETTE.healthGreen:p1hp>0.25?PALETTE.healthYellow:PALETTE.healthRed;
+  px(20,barY,Math.round(barW*p1hp),barH,p1c);
+
+  // Health fill P2 (reversed)
+  const p2c=p2hp>0.5?PALETTE.healthGreen:p2hp>0.25?PALETTE.healthYellow:PALETTE.healthRed;
+  px(W-20-Math.round(barW*p2hp),barY,Math.round(barW*p2hp),barH,p2c);
+
+  // Health borders
+  ctx.strokeStyle='#5a3a1a';ctx.lineWidth=2;
+  ctx.strokeRect(20,barY,barW,barH);ctx.strokeRect(W-20-barW,barY,barW,barH);
+
+  // Names
+  ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 11px monospace';ctx.textAlign='left';
+  ctx.fillText(p1.def.name.toUpperCase(),22,barY-2);
+  ctx.textAlign='right';ctx.fillText(p2.def.name.toUpperCase(),W-22,barY-2);
+
+  // Guard gauges
+  const p1g=p1.guardGauge/GUARD_MAX,p2g=p2.guardGauge/GUARD_MAX;
+  px(20,barY+barH+3,barW,6,'#080510');
+  px(W-20-barW,barY+barH+3,barW,6,'#080510');
+  px(20,barY+barH+3,Math.round(barW*p1g),6,PALETTE.guardBlue);
+  px(W-20-Math.round(barW*p2g),barY+barH+3,Math.round(barW*p2g),6,PALETTE.guardBlue);
+
+  // Power stocks P1
+  for(let s=0;s<3;s++){
+    const sx=22+s*38,sy=barY+barH+12;
+    px(sx,sy,34,10,'#0a0808');
+    if(s<p1.powerStocks)px(sx,sy,34,10,PALETTE.powerOrange);
+    else if(s===p1.powerStocks){
+      const partial=p1.powerCharge/POWER_MAX;
+      if(partial>0)px(sx,sy,Math.round(34*partial),10,PALETTE.powerGold);
+    }
+    ctx.strokeStyle='#5a3a1a';ctx.lineWidth=1;ctx.strokeRect(sx,sy,34,10);
+  }
+
+  // Power stocks P2
+  for(let s=0;s<3;s++){
+    const sx=W-22-34-s*38,sy=barY+barH+12;
+    px(sx,sy,34,10,'#0a0808');
+    if(s<p2.powerStocks)px(sx,sy,34,10,PALETTE.powerOrange);
+    else if(s===p2.powerStocks){
+      const partial=p2.powerCharge/POWER_MAX;
+      if(partial>0)px(sx,sy,Math.round(34*partial),10,PALETTE.powerGold);
+    }
+    ctx.strokeStyle='#5a3a1a';ctx.lineWidth=1;ctx.strokeRect(sx,sy,34,10);
+  }
+
+  // Round wins (P1)
+  for(let r=0;r<2;r++){
+    const rx=22+r*22,ry=barY+barH+26;
+    ctx.fillStyle=roundState.p1Wins>r?'#cc2222':'#2a1010';
+    ctx.fillRect(rx,ry,14,14);ctx.strokeStyle='#5a1a1a';ctx.lineWidth=1;ctx.strokeRect(rx,ry,14,14);
+  }
+  // Round wins (P2)
+  for(let r=0;r<2;r++){
+    const rx=W-22-14-r*22,ry=barY+barH+26;
+    ctx.fillStyle=roundState.p2Wins>r?'#2244cc':'#0a1025';
+    ctx.fillRect(rx,ry,14,14);ctx.strokeStyle='#1a1a5a';ctx.lineWidth=1;ctx.strokeRect(rx,ry,14,14);
+  }
+
+  // Timer
+  const timeLeft=Math.ceil(roundState.timer/60);
+  ctx.fillStyle=timeLeft<=10?'#cc2222':PALETTE.uiGold;
+  ctx.font='bold 26px monospace';ctx.textAlign='center';
+  ctx.fillText(timeLeft.toString().padStart(2,'0'),W/2,barY+22);
+  // Round number
+  ctx.fillStyle='#664444';ctx.font='9px monospace';ctx.textAlign='center';
+  ctx.fillText(`ROUND ${roundState.round}`,W/2,barY+32);
+
+  // Mode indicator
+  ctx.fillStyle='rgba(100,70,40,0.6)';ctx.font='8px monospace';ctx.textAlign='center';
+  const modeStr=gameMode==='vsAI'?`VS AI [${aiDifficulty}]`:gameMode==='local2p'?'LOCAL 2P':'ONLINE';
+  ctx.fillText(modeStr,W/2,H-6);
+}
+
+function renderAnnouncement(){
+  const f=frameCount;
+  if(roundState.phase==='ANNOUNCE'){
+    const a=Math.min(1,(90-roundState.phaseTimer)/15);
+    ctx.globalAlpha=a;
+    ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 44px monospace';ctx.textAlign='center';
+    ctx.fillText(`ROUND ${roundState.round}`,W/2,H/2-10);
+    ctx.fillStyle='#aa2222';ctx.font='bold 24px monospace';
+    ctx.fillText('FIGHT!',W/2,H/2+30);
+    ctx.globalAlpha=1;
+  }
+  if(roundState.phase==='KO'){
+    const a=Math.min(1,(120-roundState.phaseTimer)/10);
+    ctx.globalAlpha=a;
+    ctx.fillStyle='#ffffff';ctx.font='bold 54px monospace';ctx.textAlign='center';
+    ctx.fillText(roundState.koText,W/2+2,H/2+2);
+    ctx.fillStyle='#cc2222';ctx.fillText(roundState.koText,W/2,H/2);
+    if(roundState.winner==='P1'){
+      ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 16px monospace';
+      ctx.fillText(`${gameState.p1.def.name} PREVAILS`,W/2,H/2+40);
+    } else if(roundState.winner==='P2'){
+      ctx.fillStyle='#4466cc';ctx.font='bold 16px monospace';
+      ctx.fillText(`${gameState.p2.def.name} PREVAILS`,W/2,H/2+40);
+    }
+    ctx.globalAlpha=1;
+  }
+  if(roundState.phase==='GAME_OVER'){
+    ctx.fillStyle='rgba(4,2,10,0.85)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 42px monospace';ctx.textAlign='center';
+    ctx.fillText('GAME OVER',W/2,H/2-40);
+    ctx.fillStyle='#cc2222';ctx.font='bold 20px monospace';
+    const winner=roundState.p1Wins>roundState.p2Wins?gameState.p1.def:gameState.p2.def;
+    ctx.fillText(`${winner.name.toUpperCase()} WINS!`,W/2,H/2);
+    ctx.fillStyle='#886644';ctx.font='12px monospace';
+    ctx.fillText('Press ENTER to play again | ESC for menu',W/2,H/2+40);
+    if(frameCount-roundState._gameOverFrame>180){
+      if(keys['Enter']){initGame();}
+      if(keys['Escape']){quitToMenu();}
+    }
+    if(!roundState._gameOverFrame)roundState._gameOverFrame=frameCount;
+  }
+}
+
+// ── Title Screen ──────────────────────────────────────────
+function renderTitle(frame){
+  ctx.fillStyle='#04020a';ctx.fillRect(0,0,W,H);
+  for(let i=0;i<5;i++){
+    const ax=(i+0.5)*(W/5),fl=0.5+0.5*Math.sin(frame*0.03+i*1.2);
+    ctx.fillStyle=`rgba(30,10,10,${0.8*fl})`;ctx.fillRect(ax-30,0,60,H);
+  }
+  const ca=0.08+0.04*Math.sin(frame*0.02);
+  ctx.fillStyle=`rgba(100,60,20,${ca})`;
+  ctx.fillRect(W/2-8,0,16,H);ctx.fillRect(0,H*0.3,W,16);
+  for(let d=0;d<8;d++){
+    const dx=60+d*110,dl=30+Math.sin(frame*0.04+d)*20;
+    ctx.fillStyle='rgba(150,20,20,0.6)';ctx.fillRect(dx,0,3,dl);ctx.fillRect(dx-1,dl-2,5,6);
+  }
+  const ts=1+0.02*Math.sin(frame*0.04);
+  ctx.save();ctx.translate(W/2,H*0.35);ctx.scale(ts,ts);
+  ctx.fillStyle='rgba(0,0,0,0.8)';ctx.font='bold 38px monospace';ctx.textAlign='center';
+  ctx.fillText('SACRILEGIUM',3,3);ctx.fillText('PUGNA',3,48);
+  ctx.fillStyle='#c8a030';ctx.fillText('SACRILEGIUM',0,0);
+  ctx.fillStyle='#8b1a1a';ctx.fillText('PUGNA',0,45);
+  ctx.fillStyle=`rgba(200,180,120,${0.6+0.4*Math.sin(frame*0.06)})`;
+  ctx.font='13px monospace';ctx.fillText('— Gothic Pixel Horror Fighter —',0,75);
+  ctx.restore();
+  ctx.fillStyle='rgba(100,80,50,0.8)';ctx.font='10px monospace';ctx.textAlign='center';
+  ctx.fillText('In the name of The Miracle, suffer in combat.',W/2,H*0.6);
+  if(frame%60<40){ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 16px monospace';ctx.textAlign='center';ctx.fillText('✝ PRESS ENTER TO BEGIN ✝',W/2,H*0.72);}
+  [80,320,576,816].forEach((cx,i)=>{
+    const fl=0.7+0.3*Math.sin(frame*0.1+i*0.8);
+    px(cx-3,H*0.75-20,6,20,'#c0b8a8');
+    ctx.fillStyle=`rgba(255,180,20,${fl*0.8})`;ctx.fillRect(cx-3,H*0.75-28,6,6);
+    ctx.fillStyle=`rgba(255,220,80,${fl})`;ctx.fillRect(cx-1,H*0.75-31,2,4);
+  });
+}
+
+// ── Char Select Screen ────────────────────────────────────
+function renderCharSelect(frame){
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#04020c');bg.addColorStop(1,'#0c0610');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  const tf=0.8+0.2*Math.sin(frame*0.05);
+  ctx.globalAlpha=tf;
+  ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 24px monospace';ctx.textAlign='center';
+  ctx.fillText('✝ SACRILEGIUM PUGNA ✝',W/2,35);
+  ctx.fillStyle='#884444';ctx.font='12px monospace';
+  ctx.fillText('SELECT YOUR CONDEMNED SOUL',W/2,55);ctx.globalAlpha=1;
+
+  const pw=152,ph=110,sx=(W-(ROSTER.length*(pw+8)))/2,py=70;
+  ROSTER.forEach((char,i)=>{
+    const px2=sx+i*(pw+8);
+    const isP1=i===p1SelIdx,isP2=i===p2SelIdx;
+    ctx.fillStyle=isP1&&isP2?'#2a1830':isP1?'#1a0808':isP2?'#08101a':'#0a0810';
+    ctx.fillRect(px2,py,pw,ph);
+    ctx.strokeStyle=isP1&&isP2?'#aa44aa':isP1?'#cc2222':isP2?'#2244cc':'#3a2030';
+    ctx.lineWidth=isP1||isP2?3:1;ctx.strokeRect(px2,py,pw,ph);
+    if(isP1){ctx.fillStyle='#cc2222';ctx.font='bold 9px monospace';ctx.textAlign='left';ctx.fillText('P1',px2+4,py+12);}
+    if(isP2){ctx.fillStyle='#2244cc';ctx.font='bold 9px monospace';ctx.textAlign='right';ctx.fillText('P2',px2+pw-4,py+12);}
+    // Mini char
+    ctx.save();ctx.beginPath();ctx.rect(px2+2,py+15,pw-4,ph-30);ctx.clip();
+    drawMiniChar(char,px2+pw/2,py+75,frame+i*17);
+    ctx.restore();
+    ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 9px monospace';ctx.textAlign='center';
+    ctx.fillText(char.name,px2+pw/2,py+ph-12);
+    ctx.fillStyle='#886644';ctx.font='8px monospace';
+    ctx.fillText(`[${char.archetype}]`,px2+pw/2,py+ph-3);
+  });
+
+  // Lore panel
+  const sel=ROSTER[p1SelIdx];
+  if(sel){
+    const iy=py+ph+20;
+    ctx.fillStyle='rgba(10,5,20,0.9)';ctx.fillRect(30,iy,W-60,80);
+    ctx.strokeStyle=PALETTE.uiBorder;ctx.lineWidth=1;ctx.strokeRect(30,iy,W-60,80);
+    ctx.fillStyle=PALETTE.uiGold;ctx.font='bold 14px monospace';ctx.textAlign='left';
+    ctx.fillText(sel.title,44,iy+20);
+    ctx.fillStyle='#c0a880';ctx.font='9px monospace';
+    const words=sel.lore.split(' ');let line='',ly=iy+36;
+    words.forEach(w=>{
+      const t=line+w+' ';
+      if(ctx.measureText(t).width>W-100){ctx.fillText(line,44,ly);line=w+' ';ly+=12;}else line=t;
+    });
+    ctx.fillText(line,44,ly);
+  }
+
+  // Controls
+  ctx.fillStyle='#664444';ctx.font='10px monospace';ctx.textAlign='center';
+  ctx.fillText('P1: ← → to select  |  P2: A D to select  (VS AI: auto)',W/2,H-30);
+  ctx.fillText(`Mode: ${gameMode==='vsAI'?'VS COMPUTER [AI: '+aiDifficulty+']':gameMode==='local2p'?'LOCAL 2 PLAYER':'ONLINE'}  |  Press ENTER to fight!`,W/2,H-15);
+}
+
+function drawMiniChar(char,x,y,frame){
+  const bob=Math.sin(frame*0.06)*2,oy=y+bob,c=char.spriteConfig;
+  switch(char.id){
+    case 'penitent':
+      px(x-4,oy-38,8,8,c.armorColor);px(x-3,oy-46,6,10,c.armorColor);px(x-1,oy-54,2,10,c.armorColor);
+      px(x-6,oy-26,12,26,c.armorColor);px(x+8,oy-18,3,20,c.weaponColor);
+      px(x-3,oy-30,6,3,c.eyeColor);break;
+    case 'martyr':
+      px(x-9,oy-40,18,40,c.bodyColor);px(x-6,oy-50,12,12,'#3a2010');
+      px(x-3,oy-46,3,3,c.eyeColor);px(x+1,oy-46,3,3,c.eyeColor);
+      for(let i=0;i<3;i++)ctx.fillRect(x-8+i*5,oy-35,3,15);break;
+    case 'oracle':
+      px(x-4,oy-40,8,10,'#d4c8b0');px(x-2,oy-38,2,4,'#1a0a0a');px(x+1,oy-38,2,4,'#1a0a0a');
+      px(x-6,oy-30,12,30,c.armorColor);
+      const ang=frame*0.08;
+      px(x+Math.cos(ang)*12-2,oy-28+Math.sin(ang)*5-2,4,4,c.effectColor);break;
+    case 'seraph':
+      px(x-5,oy-38,10,20,c.armorColor);px(x-3,oy-46,6,10,c.armorColor);
+      px(x-18,oy-38,14,20,'#2a3a5a');px(x+5,oy-38,14,20,'#2a3a5a');
+      px(x-1,oy-42,2,2,c.eyeColor);break;
+    case 'inquisitor':
+      px(x-6,oy-38,12,30,c.bodyColor);px(x-4,oy-46,8,10,'#e8d8b8');
+      px(x-3,oy-42,6,2,c.eyeColor);px(x+6,oy-22,12,2,c.weaponColor);break;
+  }
+}
+
+// ── UI Functions ──────────────────────────────────────────
+function togglePause(){
+  if(gamePhase!=='FIGHTING')return;
+  paused=!paused;
+  document.getElementById('pauseMenu').classList.toggle('hidden',!paused);
+}
+function resumeGame(){paused=false;document.getElementById('pauseMenu').classList.add('hidden');}
+function quitToMenu(){
+  paused=false;
+  document.getElementById('pauseMenu').classList.add('hidden');
+  document.getElementById('mainMenu').classList.remove('hidden');
+  gamePhase='TITLE';gameState=null;
+  if(conn){conn.close();conn=null;}
+  if(peer){peer.destroy();peer=null;}
+}
+
+function setDiff(d){
+  aiDifficulty=d;
+  ['EASY','MEDIUM','HARD'].forEach(x=>{
+    document.getElementById('diff-'+x).classList.toggle('active',x===d);
+  });
+}
+
+function startMode(mode){
+  gameMode=mode;
+  if(mode==='online'){
+    document.getElementById('mainMenu').classList.add('hidden');
+    document.getElementById('lobbyPanel').classList.remove('hidden');
+    initPeer();
+  } else {
+    document.getElementById('mainMenu').classList.add('hidden');
+    gamePhase='CHAR_SELECT';
+  }
+}
+
+function cancelLobby(){
+  document.getElementById('lobbyPanel').classList.add('hidden');
+  document.getElementById('mainMenu').classList.remove('hidden');
+  if(peer){peer.destroy();peer=null;}
+}
+
+// ── Online Multiplayer (PeerJS) ───────────────────────────
+function genCode(){return Math.random().toString(36).substr(2,6).toUpperCase();}
+
+function initPeer(){
+  const code=genCode();
+  document.getElementById('myCode').textContent='loading...';
+  document.getElementById('lobbyStatus').textContent='Connecting to network...';
+
+  try{
+    peer=new Peer('sacpugna-'+code,{
+      host:'0.peerjs.com',port:443,secure:true,
+      config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}
+    });
+
+    peer.on('open',id=>{
+      document.getElementById('myCode').textContent=code;
+      document.getElementById('lobbyStatus').textContent='✓ Connected! Share your code or enter your friend\'s.';
+      isOnlineHost=true;
+    });
+
+    peer.on('connection',c=>{
+      conn=c;
+      setupConn(c);
+      document.getElementById('lobbyStatus').textContent='✓ Friend connected! Starting match...';
+      isOnlineHost=true;
+      setTimeout(()=>{startOnlineMatch();},1500);
+    });
+
+    peer.on('error',e=>{
+      document.getElementById('lobbyStatus').textContent='Network error: '+e.type+'. Try refreshing.';
+    });
+  }catch(e){
+    document.getElementById('lobbyStatus').textContent='PeerJS error. Try again.';
+  }
+}
+
+function joinRoom(){
+  const code=document.getElementById('joinCode').value.trim().toUpperCase();
+  if(code.length<4){document.getElementById('lobbyStatus').textContent='Enter a valid code!';return;}
+  document.getElementById('lobbyStatus').textContent='Connecting to '+code+'...';
+  if(!peer){
+    const myCode=genCode();
+    peer=new Peer('sacpugna-'+myCode,{
+      host:'0.peerjs.com',port:443,secure:true,
+      config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}
+    });
+    peer.on('open',()=>{doJoin(code);});
+    peer.on('error',e=>document.getElementById('lobbyStatus').textContent='Error: '+e.type);
+  } else {doJoin(code);}
+}
+
+function doJoin(code){
+  isOnlineHost=false;
+  const c=peer.connect('sacpugna-'+code,{reliable:true});
+  conn=c;setupConn(c);
+  c.on('open',()=>{
+    document.getElementById('lobbyStatus').textContent='✓ Connected! Waiting for host to start...';
+    c.send({type:'ready',charIdx:p2SelIdx});
+  });
+}
+
+function setupConn(c){
+  c.on('data',data=>{
+    if(data.type==='held'){
+      remoteInputs=data.held;
+    } else if(data.type==='btn'){
+      if(gameState){
+        const target=isOnlineHost?gameState.p2:gameState.p1;
+        target.buf.press(data.btn);
+      }
+    } else if(data.type==='ready'){
+      p2SelIdx=data.charIdx||1;
+    } else if(data.type==='start'){
+      p1SelIdx=data.p1char||0;p2SelIdx=data.p2char||1;
+      startOnlineMatch();
+    }
+  });
+  c.on('close',()=>{document.getElementById('lobbyStatus').textContent='Connection closed.';});
+}
+
+function startOnlineMatch(){
+  if(isOnlineHost&&conn){
+    conn.send({type:'start',p1char:p1SelIdx,p2char:p2SelIdx});
+  }
+  onlineReady=true;
+  document.getElementById('lobbyPanel').classList.add('hidden');
+  gamePhase='FIGHTING';
+  initGame();
+}
+
+// ── Start ─────────────────────────────────────────────────
+gamePhase='TITLE';
+gameLoop();
+
+// Enter key on title/game-over
+window.addEventListener('keydown',e=>{
+  if(e.code==='Enter'&&roundState?.phase==='GAME_OVER'){initGame();}
+});
+</script>
+</body>
 </html>
